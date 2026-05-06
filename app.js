@@ -6,7 +6,6 @@ let rawGlobalData = [];
 let globalData = [];
 let currentView = 'dashboard';
 let lockedComercial = null; // Nueva variable para bloquear vista por vendedor
-let lockedComercial = null; // Nueva variable para bloquear vista por vendedor
 
 // IndexedDB Persistence
 const DB_NAME = 'SalesDB_v4';
