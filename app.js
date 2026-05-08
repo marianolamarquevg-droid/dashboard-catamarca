@@ -115,12 +115,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnExport) {
         btnExport.addEventListener('click', exportDataForMobile);
     }
+
+    const btnExportMix = document.getElementById('btnExportMix');
+    if (btnExportMix) btnExportMix.addEventListener('click', exportMixToExcel);
 });
+
+const REMOTE_DATA_URL = './data.json';
 
 // Nueva función para buscar datos en el servidor (GitHub Pages)
 async function checkRemoteData() {
     try {
-        const response = await fetch('./data.json?t=' + new Date().getTime()); // Evitar caché
+        const response = await fetch(REMOTE_DATA_URL + '?t=' + new Date().getTime()); // Evitar caché
         if (response.ok) {
             const remoteData = await response.json();
             if (remoteData && remoteData.length > 0) {
@@ -175,7 +180,8 @@ const dataStatus = document.getElementById('data-status');
 const views = {
     dashboard: document.getElementById('dashboardView'),
     'client-search': document.getElementById('clientSearchView'),
-    comercial: document.getElementById('comercialView')
+    comercial: document.getElementById('comercialView'),
+    mix: document.getElementById('mixView')
 };
 
 // Nav links
@@ -496,7 +502,7 @@ function renderDashboard() {
     
     let comercialClientList = [];
     for (let comercial in comercialClientStats) {
-        let clientsInComercial = Object.entries(comercialClientStats[comercial]).sort((a,b) => b[1]-a[1]).slice(0, 10);
+        let clientsInComercial = Object.entries(comercialClientStats[comercial]).sort((a,b) => b[1]-a[1]);
         clientsInComercial.forEach(clientArr => {
              comercialClientList.push({ comercial: comercial, client: clientArr[0], val: clientArr[1] });
         });
@@ -650,9 +656,62 @@ function renderCharts(comercialStats) {
 
 
 // Client Search View
+const searchSuggestions = document.getElementById('searchSuggestions');
+const clientSearchInput = document.getElementById('clientSearchInput');
+
+clientSearchInput.addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase().trim();
+    if (term.length < 2) {
+        searchSuggestions.classList.add('hidden');
+        return;
+    }
+
+    // Get unique clients from rawGlobalData
+    const clientsMap = new Map();
+    rawGlobalData.forEach(r => {
+        if (r.cliente.toLowerCase().includes(term) || String(r.id_cliente).toLowerCase().includes(term)) {
+            if (!clientsMap.has(r.id_cliente)) {
+                clientsMap.set(r.id_cliente, r.cliente);
+            }
+        }
+    });
+
+    const suggestions = Array.from(clientsMap.entries()).slice(0, 10);
+
+    if (suggestions.length === 0) {
+        searchSuggestions.classList.add('hidden');
+        return;
+    }
+
+    searchSuggestions.innerHTML = '';
+    suggestions.forEach(([id, name]) => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.innerHTML = `<span class="client-id">${id}</span><span class="client-name">${name}</span>`;
+        div.addEventListener('click', () => {
+            clientSearchInput.value = name;
+            searchSuggestions.classList.add('hidden');
+            searchClient();
+        });
+        searchSuggestions.appendChild(div);
+    });
+
+    searchSuggestions.classList.remove('hidden');
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', (e) => {
+    if (!clientSearchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+        searchSuggestions.classList.add('hidden');
+    }
+});
+
 document.getElementById('btnSearchClient').addEventListener('click', searchClient);
 document.getElementById('clientSearchInput').addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') searchClient();
+    if (e.key === 'Enter') {
+        searchSuggestions.classList.add('hidden');
+        searchClient();
+    }
 });
 
 function searchClient() {
@@ -809,6 +868,10 @@ document.getElementById('monthFilter').addEventListener('change', (e) => {
     if (currentView === 'comercial') {
         renderComercialAnalysis();
     }
+
+    if (currentView === 'mix') {
+        renderMixView();
+    }
 });
 
 // Override switchView to render Comercial Analysis when clicking the nav link
@@ -817,6 +880,9 @@ switchView = function(viewName) {
     originalSwitchView(viewName);
     if (viewName === 'comercial') {
         renderComercialAnalysis();
+    }
+    if (viewName === 'mix') {
+        renderMixView();
     }
 };
 
@@ -989,4 +1055,114 @@ function checkLockedComercial() {
             }, 500);
         });
     }
+}
+
+function renderMixView() {
+    const clientsMix = {};
+    
+    globalData.forEach(r => {
+        const clientKey = r.cliente; 
+        if (!clientsMix[clientKey]) {
+            clientsMix[clientKey] = {
+                prods: new Set(),
+                comercial: r.comercial
+            };
+        }
+        clientsMix[clientKey].prods.add(r.producto);
+    });
+
+    const categories = {
+        '1_4': [],
+        '5_10': [],
+        '11_20': [],
+        '21_plus': []
+    };
+
+    Object.entries(clientsMix).forEach(([name, data]) => {
+        const count = data.prods.size;
+        const info = { name, count, comercial: data.comercial };
+        
+        if (count <= 4) categories['1_4'].push(info);
+        else if (count <= 10) categories['5_10'].push(info);
+        else if (count <= 20) categories['11_20'].push(info);
+        else categories['21_plus'].push(info);
+    });
+
+    // Update Counts and Tables
+    const updateCat = (id, list, tableId) => {
+        const countEl = document.getElementById(id);
+        if (countEl) countEl.textContent = `${list.length} Clientes`;
+        
+        const tb = document.querySelector(`#${tableId} tbody`);
+        if (tb) {
+            tb.innerHTML = '';
+            list.sort((a,b) => b.count - a.count).forEach(c => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td style="font-size:0.85rem;">${c.name} <br><small style="color:var(--text-muted)">${c.comercial}</small></td><td style="font-weight:700; color:var(--primary)">${c.count}</td>`;
+                tb.appendChild(tr);
+            });
+        }
+    };
+
+    updateCat('countMix1_4', categories['1_4'], 'tableMix1_4');
+    updateCat('countMix5_10', categories['5_10'], 'tableMix5_10');
+    updateCat('countMix11_20', categories['11_20'], 'tableMix11_20');
+    updateCat('countMix21_plus', categories['21_plus'], 'tableMix21_plus');
+
+    lucide.createIcons();
+}
+
+function exportMixToExcel() {
+    if (globalData.length === 0) {
+        alert('No hay datos para exportar.');
+        return;
+    }
+
+    const clientsMix = {};
+    globalData.forEach(r => {
+        const clientKey = r.cliente; 
+        if (!clientsMix[clientKey]) {
+            clientsMix[clientKey] = {
+                id: r.id_cliente,
+                name: r.cliente,
+                comercial: r.comercial,
+                prods: new Set()
+            };
+        }
+        clientsMix[clientKey].prods.add(r.producto);
+    });
+
+    const data = Object.values(clientsMix).map(d => {
+        const count = d.prods.size;
+        let category = '';
+        if (count <= 4) category = '1 a 4 Items';
+        else if (count <= 10) category = '5 a 10 Items';
+        else if (count <= 20) category = '11 a 20 Items';
+        else category = '+20 Items';
+
+        return {
+            'ID Cliente': d.id,
+            'Cliente': d.name,
+            'Comercial': d.comercial,
+            'Cant. Productos Distintos': count,
+            'Categoría Mix': category
+        };
+    }).sort((a, b) => b['Cant. Productos Distintos'] - a['Cant. Productos Distintos']);
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mix de Productos");
+    
+    // Set column widths
+    const wscols = [
+        {wch: 15}, // ID
+        {wch: 40}, // Cliente
+        {wch: 25}, // Comercial
+        {wch: 25}, // Cantidad
+        {wch: 20}  // Categoria
+    ];
+    ws['!cols'] = wscols;
+
+    const fileName = `Mix_Productos_Catamarca_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
 }

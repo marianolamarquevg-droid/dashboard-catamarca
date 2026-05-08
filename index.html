@@ -31,6 +31,7 @@
                 <a href="#" class="active" data-view="dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</a>
                 <a href="#" data-view="client-search"><i data-lucide="users"></i> Buscar Cliente</a>
                 <a href="#" data-view="comercial"><i data-lucide="briefcase"></i> Análisis por Comercial</a>
+                <a href="#" data-view="mix"><i data-lucide="layers"></i> Mix de Productos</a>
             </nav>
             <div class="sidebar-bottom">
                 <div class="upload-btn-wrapper">
@@ -132,7 +133,7 @@
                 <!-- Secondary Tables Row -->
                 <div class="tables-row" style="grid-template-columns: 1fr 1fr;">
                     <div class="table-card">
-                        <h3>Top 10 Clientes por Comercial</h3>
+                        <h3>Ranking de Clientes por Comercial</h3>
                         <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                             <table id="topClientsComercialTable">
                                 <thead style="position: sticky; top: 0; background: var(--bg-surface); z-index: 1;">
@@ -222,9 +223,10 @@
             <div class="content-wrapper hidden" id="clientSearchView">
                 <div class="search-section">
                     <h2>Ficha Dinámica de Cliente</h2>
-                    <div class="search-box">
-                        <input type="text" id="clientSearchInput" placeholder="Ingresa el ID o Nombre del Cliente...">
+                    <div class="search-box" style="position: relative;">
+                        <input type="text" id="clientSearchInput" placeholder="Ingresa el ID o Nombre del Cliente..." autocomplete="off">
                         <button id="btnSearchClient"><i data-lucide="search"></i></button>
+                        <div id="searchSuggestions" class="suggestions-list hidden"></div>
                     </div>
                 </div>
 
@@ -321,6 +323,75 @@
                                 <tbody>
                                     <!-- Populated by JS -->
                                 </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mix de Productos View -->
+            <div class="content-wrapper hidden" id="mixView">
+                <div class="search-section">
+                    <h2>Distribución por Mix de Productos</h2>
+                    <p style="color: var(--text-muted);">Clientes categorizados por la cantidad de productos distintos que compran en el periodo seleccionado.</p>
+                    <button id="btnExportMix" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-family: inherit;">
+                        <i data-lucide="download"></i> Exportar a Excel
+                    </button>
+                </div>
+
+                <div class="tables-row" style="grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <!-- Categoría 1-4 -->
+                    <div class="table-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin:0;">Mix 1 a 4 Items</h3>
+                            <span class="badge" id="countMix1_4" style="background:rgba(239, 68, 68, 0.1); color:#ef4444;">0 Clientes</span>
+                        </div>
+                        <div class="table-responsive" style="max-height: 400px;">
+                            <table id="tableMix1_4">
+                                <thead><tr><th>Cliente</th><th>Items</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Categoría 5-10 -->
+                    <div class="table-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin:0;">Mix 5 a 10 Items</h3>
+                            <span class="badge" id="countMix5_10" style="background:rgba(245, 158, 11, 0.1); color:#f59e0b;">0 Clientes</span>
+                        </div>
+                        <div class="table-responsive" style="max-height: 400px;">
+                            <table id="tableMix5_10">
+                                <thead><tr><th>Cliente</th><th>Items</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Categoría 11-20 -->
+                    <div class="table-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin:0;">Mix 11 a 20 Items</h3>
+                            <span class="badge" id="countMix11_20" style="background:rgba(59, 130, 246, 0.1); color:#3b82f6;">0 Clientes</span>
+                        </div>
+                        <div class="table-responsive" style="max-height: 400px;">
+                            <table id="tableMix11_20">
+                                <thead><tr><th>Cliente</th><th>Items</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Categoría +20 -->
+                    <div class="table-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin:0;">Mix +20 Items</h3>
+                            <span class="badge" id="countMix21_plus" style="background:rgba(16, 185, 129, 0.1); color:#10b981;">0 Clientes</span>
+                        </div>
+                        <div class="table-responsive" style="max-height: 400px;">
+                            <table id="tableMix21_plus">
+                                <thead><tr><th>Cliente</th><th>Items</th></tr></thead>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
