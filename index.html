@@ -48,12 +48,12 @@
                     <h1>Resumen de Ventas</h1>
                     <p class="subtitle">Sucursal Catamarca — Análisis por Comercial</p>
                 </div>
-                <div class="header-actions" style="display: flex; align-items: center; gap: 1rem;">
-                    <select id="monthFilter" class="hidden" style="padding: 0.5rem 1rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit;">
+                <div class="header-actions">
+                    <select id="monthFilter" class="hidden">
                         <option value="ALL">Todos los Meses</option>
                     </select>
-                    <button id="btnExportRemote" class="hidden" style="padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-family: inherit;">Exportar para Móvil</button>
-                    <button id="btnClearData" class="hidden" style="padding: 0.5rem 1rem; background: var(--danger, #ef4444); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-family: inherit;">Borrar Datos</button>
+                    <button id="btnExportRemote" class="hidden">Exportar para Móvil</button>
+                    <button id="btnClearData" class="hidden">Borrar Datos</button>
                     <span id="data-status" class="status-badge empty">Esperando datos...</span>
                 </div>
             </header>
@@ -69,7 +69,7 @@
 
             <div class="content-wrapper hidden" id="dashboardView">
                 <!-- KPIs -->
-                <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div class="kpi-grid">
                     <div class="kpi-card">
                         <div class="kpi-header">
                             <h3>Facturación Total</h3>
@@ -131,7 +131,7 @@
                 </div>
 
                 <!-- Secondary Tables Row -->
-                <div class="tables-row" style="grid-template-columns: 1fr 1fr;">
+                <div class="tables-row two-cols">
                     <div class="table-card">
                         <h3>Ranking de Clientes por Comercial</h3>
                         <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -143,9 +143,7 @@
                                         <th>Facturación</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <!-- Populated by JS -->
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -161,16 +159,14 @@
                                         <th>vs Mes Ant.</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <!-- Populated by JS -->
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
                 <!-- Main Detailed Table -->
-                <div class="tables-row" style="grid-template-columns: 1fr;">
+                <div class="tables-row">
                     <div class="table-card">
                         <h3>Detalle de Compras por Cliente</h3>
                         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
@@ -185,9 +181,7 @@
                                         <th>Total (Sin IVA)</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <!-- Populated by JS -->
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -211,9 +205,7 @@
                                         <th>Diferencia</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <!-- Populated by JS -->
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -274,13 +266,10 @@
                                         <thead id="clientProductsTableHead">
                                             <tr>
                                                 <th>Producto</th>
-                                                <!-- Meses dinámicos se insertarán aquí -->
                                                 <th>Total 6 Meses</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
-                                            <!-- Populated by JS -->
-                                        </tbody>
+                                        <tbody></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -300,7 +289,6 @@
                     <h2>Análisis por Comercial</h2>
                     <div class="search-box" style="max-width: 400px;">
                         <select id="comercialSelector" style="width: 100%; padding: 1rem 1.5rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: inherit; font-size: 1rem;">
-                            <!-- Populated dynamically -->
                         </select>
                     </div>
                 </div>
@@ -320,9 +308,7 @@
                                         <th>Estado</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <!-- Populated by JS -->
-                                </tbody>
+                                <tbody></tbody>
                             </table>
                         </div>
                     </div>
@@ -339,8 +325,7 @@
                     </button>
                 </div>
 
-                <div class="tables-row" style="grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-                    <!-- Categoría 1-4 -->
+                <div class="tables-row mix-grid">
                     <div class="table-card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin:0;">Mix 1 a 4 Items</h3>
@@ -354,7 +339,6 @@
                         </div>
                     </div>
 
-                    <!-- Categoría 5-10 -->
                     <div class="table-card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin:0;">Mix 5 a 10 Items</h3>
@@ -368,7 +352,6 @@
                         </div>
                     </div>
 
-                    <!-- Categoría 11-20 -->
                     <div class="table-card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin:0;">Mix 11 a 20 Items</h3>
@@ -382,7 +365,6 @@
                         </div>
                     </div>
 
-                    <!-- Categoría +20 -->
                     <div class="table-card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin:0;">Mix +20 Items</h3>
