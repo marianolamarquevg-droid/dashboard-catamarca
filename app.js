@@ -586,14 +586,14 @@ function renderDashboard() {
         if (!prodStats[row.producto]) prodStats[row.producto] = 0;
         prodStats[row.producto] += row.cantidad;
 
-        // Mapa para Ranking de Clientes por Vendedor (Vendedor | Cliente)
+        // Ranking de Clientes por Vendedor (Vendedor | Cliente)
         let keyCC = c + '|' + row.cliente;
         if (!clientComercialMap[keyCC]) {
             clientComercialMap[keyCC] = { vendedor: c, cliente: row.cliente, total: 0 };
         }
         clientComercialMap[keyCC].total += row.facturacion;
 
-        // Mapa para Productos (Evolución) con detalle por mes para cada cliente
+        // Productos (Evolución)
         if (!productMonthlyMap[row.producto]) {
             productMonthlyMap[row.producto] = { totalQty: 0, byMonth: {}, clients: new Set() };
         }
@@ -622,7 +622,7 @@ function renderDashboard() {
     const elTopProd = document.getElementById('kpiTopProduct');
     if (elTopProd) elTopProd.textContent = topProduct ? topProduct[0] : '-';
 
-    // 1. Rellenar Tabla: Detalle de Compras por Cliente
+    // 1. Rellenar Tabla: Detalle de Compras por Cliente (Columnas: ID Cliente | Cliente | Comercial | Producto | Cantidad | Total)
     const tb = document.querySelector('#mainDetailTable tbody') || document.querySelector('.dashboard-view table tbody');
     if (tb) {
         tb.innerHTML = '';
@@ -651,20 +651,20 @@ function renderDashboard() {
                 <td style="font-weight:500;">${item.cliente}</td>
                 <td>${item.comercial}</td>
                 <td>${item.producto}</td>
-                <td>${formatNumber(item.cantidad)}</td>
-                <td style="font-weight:600; color:var(--success)">${formatCurrency(item.total)}</td>
+                <td style="text-align: right;">${formatNumber(item.cantidad)}</td>
+                <td style="font-weight:600; color:var(--success); text-align: right;">${formatCurrency(item.total)}</td>
             `;
             tb.appendChild(tr);
         });
     }
 
-    // 2. Rellenar Tabla: Ranking de Clientes por Vendedor (Vendedor | Cliente | Facturación)
+    // 2. Rellenar Tabla: Ranking de Clientes por Vendedor (Columnas: Vendedor | Cliente | Facturación)
     const tables = document.querySelectorAll('#dashboardView table, .dashboard-view table');
     if (tables.length > 1) {
         let rankingTableBody = tables[1].querySelector('tbody');
         if (rankingTableBody) {
             rankingTableBody.innerHTML = '';
-            let sortedCC = Object.values(clientComercialMap).sort((a, b) => b.total - a.total).slice(0, 50);
+            let sortedCC = Object.values(clientComercialMap).sort((a, b) => b[1].total - a[1].total).slice(0, 50);
             sortedCC.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -707,7 +707,6 @@ function renderDashboard() {
                 prodTableBody.appendChild(tr);
             });
 
-            // Evento para abrir el modal del ojo con los clientes del producto
             prodTableBody.querySelectorAll('.eye-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     let prodName = btn.getAttribute('data-product');
