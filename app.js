@@ -44,9 +44,6 @@ function updateMonthFilter() {
 }
 
 function populateComercialSelect() {
-    const select = document.getElementById('comercialSelect');
-    if (!select) return;
-    
     let comercialesSet = new Set();
     const dataSource = globalData.length > 0 ? globalData : rawGlobalData;
     dataSource.forEach(r => {
@@ -55,9 +52,25 @@ function populateComercialSelect() {
         }
     });
 
-    select.innerHTML = '<option value="">Selecciona un Comercial...</option>';
-    Array.from(comercialesSet).sort().forEach(c => {
-        select.innerHTML += `<option value="${c}">${c}</option>`;
+    // Buscar cualquier select o contenedor en la vista de comercial
+    const possibleSelectors = [
+        document.getElementById('comercialSelect'),
+        document.getElementById('selectComercial'),
+        document.getElementById('vendedorSelect'),
+        document.querySelector('#comercialView select'),
+        document.querySelector('.comercial-view select')
+    ];
+
+    possibleSelectors.forEach(select => {
+        if (select) {
+            select.innerHTML = '<option value="">Selecciona un Comercial...</option>';
+            Array.from(comercialesSet).sort().forEach(c => {
+                select.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+            select.style.height = '44px';
+            select.style.fontSize = '16px';
+            select.style.width = '100%';
+        }
     });
 }
 
@@ -112,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL (MODAL, SELECTS Y TABLAS)
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -150,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 font-size: 1.1rem !important;
                 white-space: normal !important;
             }
-            #clientSearchInput, #comercialSelect {
+            #clientSearchInput, select {
                 height: 44px !important;
                 font-size: 16px !important;
                 width: 100% !important;
@@ -177,15 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
         clientSearchInput.style.fontSize = '16px';
     }
 
-    const comercialSelect = document.getElementById('comercialSelect');
-    if (comercialSelect) {
-        comercialSelect.style.height = '44px';
-        comercialSelect.style.fontSize = '16px';
-        comercialSelect.style.width = '100%';
-        comercialSelect.addEventListener('change', (e) => {
+    // Escuchar cambios en cualquier select de comercial
+    document.addEventListener('change', (e) => {
+        if (e.target && (e.target.id === 'comercialSelect' || e.target.id === 'selectComercial' || e.target.id === 'vendedorSelect')) {
             renderComercialAnalysis(e.target.value);
-        });
-    }
+        }
+    });
 
     setupModalCloseHandlers();
 
@@ -608,8 +618,6 @@ function renderDashboard() {
 function renderComercialAnalysis(comercialName) {
     if (!comercialName) return;
     const comercialRows = globalData.filter(r => r.comercial === comercialName);
-    
-    // Aquí puedes actualizar las tablas o tarjetas específicas de análisis por comercial si las tienes
     console.log(`Analizando comercial: ${comercialName}, con ${comercialRows.length} registros`);
 }
 
