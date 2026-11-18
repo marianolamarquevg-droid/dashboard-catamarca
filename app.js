@@ -30,6 +30,7 @@ function saveToDB(data) {
 function updateMonthFilter() {
     let allMonthsSet = new Set(rawGlobalData.map(d => d.mes));
     const monthSelect = document.getElementById('monthFilter');
+    if (!monthSelect) return;
     monthSelect.innerHTML = '<option value="ALL">Todos los Meses</option>';
     monthSelect.innerHTML += '<option value="LAST_2">Últimos 2 Meses</option>';
     monthSelect.innerHTML += '<option value="LAST_3">Últimos 3 Meses</option>';
@@ -57,7 +58,6 @@ function loadFromDB() {
         getReq.onsuccess = () => {
             if (getReq.result && getReq.result.data && getReq.result.data.length > 0) {
                 rawGlobalData = getReq.result.data;
-                // Migración de datos viejos: si tiene transporte pero no comercial
                 rawGlobalData.forEach(r => {
                     if (r.transporte && !r.comercial) r.comercial = r.transporte;
                 });
@@ -68,12 +68,16 @@ function loadFromDB() {
 
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
-                dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
-                dataStatus.className = 'status-badge loaded';
-                document.getElementById('btnClearData').classList.remove('hidden');
-                document.getElementById('btnExportRemote').classList.remove('hidden');
-                uploadOverlay.classList.add('hidden');
-                views[currentView].classList.remove('hidden');
+                if (dataStatus) {
+                    dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
+                    dataStatus.className = 'status-badge loaded';
+                }
+                const btnClear = document.getElementById('btnClearData');
+                const btnExport = document.getElementById('btnExportRemote');
+                if (btnClear) btnClear.classList.remove('hidden');
+                if (btnExport) btnExport.classList.remove('hidden');
+                if (uploadOverlay) uploadOverlay.classList.add('hidden');
+                if (views[currentView]) views[currentView].classList.remove('hidden');
                 renderDashboard();
             }
         };
@@ -96,13 +100,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const store = tx.objectStore(STORE_NAME);
                     store.clear();
                 };
-                document.getElementById('monthFilter').classList.add('hidden');
+                const monthFilter = document.getElementById('monthFilter');
+                if (monthFilter) monthFilter.classList.add('hidden');
                 btnClear.classList.add('hidden');
-                dataStatus.textContent = 'Esperando datos...';
-                dataStatus.className = 'status-badge empty';
-                uploadOverlay.classList.remove('hidden');
+                if (dataStatus) {
+                    dataStatus.textContent = 'Esperando datos...';
+                    dataStatus.className = 'status-badge empty';
+                }
+                if (uploadOverlay) uploadOverlay.classList.remove('hidden');
                 document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
-                document.querySelector(`[data-view="dashboard"]`).classList.add('active');
+                const dashNav = document.querySelector(`[data-view="dashboard"]`);
+                if (dashNav) dashNav.classList.add('active');
                 Object.values(views).forEach(v => v.classList.add('hidden'));
             }
         });
@@ -112,9 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnExport) {
         btnExport.addEventListener('click', exportDataForMobile);
     }
-
-    const btnExportMix = document.getElementById('btnExportMix');
-    if (btnExportMix) btnExportMix.addEventListener('click', exportMixToExcel);
 });
 
 const REMOTE_DATA_URL = './data.json';
@@ -131,12 +136,16 @@ async function checkRemoteData() {
                 }
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
-                dataStatus.textContent = `Datos Sincronizados (${globalData.length} filas)`;
-                dataStatus.className = 'status-badge loaded';
-                uploadOverlay.classList.add('hidden');
-                document.getElementById('btnClearData').classList.remove('hidden');
-                document.getElementById('btnExportRemote').classList.remove('hidden');
-                views[currentView].classList.remove('hidden');
+                if (dataStatus) {
+                    dataStatus.textContent = `Datos Sincronizados (${globalData.length} filas)`;
+                    dataStatus.className = 'status-badge loaded';
+                }
+                if (uploadOverlay) uploadOverlay.classList.add('hidden');
+                const btnClear = document.getElementById('btnClearData');
+                const btnExport = document.getElementById('btnExportRemote');
+                if (btnClear) btnClear.classList.remove('hidden');
+                if (btnExport) btnExport.classList.remove('hidden');
+                if (views[currentView]) views[currentView].classList.remove('hidden');
                 renderDashboard();
                 saveToDB(rawGlobalData);
             }
@@ -188,51 +197,60 @@ document.querySelectorAll('.sidebar nav a').forEach(link => {
 function switchView(viewName) {
     currentView = viewName;
     document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
-    document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+    const activeNav = document.querySelector(`[data-view="${viewName}"]`);
+    if (activeNav) activeNav.classList.add('active');
     
-    Object.values(views).forEach(v => v.classList.add('hidden'));
+    Object.values(views).forEach(v => {
+        if (v) v.classList.add('hidden');
+    });
     
     if (globalData.length > 0) {
-        uploadOverlay.classList.add('hidden');
-        views[viewName].classList.remove('hidden');
+        if (uploadOverlay) uploadOverlay.classList.add('hidden');
+        if (views[viewName]) views[viewName].classList.remove('hidden');
     } else {
-        uploadOverlay.classList.remove('hidden');
+        if (uploadOverlay) uploadOverlay.classList.remove('hidden');
     }
 }
 
 // Drag & Drop Handlers
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    uploadBox.addEventListener(eventName, preventDefaults, false);
-});
+if (uploadBox) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadBox.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadBox.addEventListener(eventName, () => uploadBox.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadBox.addEventListener(eventName, () => uploadBox.classList.remove('dragover'), false);
+    });
+
+    uploadBox.addEventListener('drop', (e) => {
+        let dt = e.dataTransfer;
+        let files = dt.files;
+        handleFiles(files);
+    });
+}
+
+if (fileInput) {
+    fileInput.addEventListener('change', function() {
+        handleFiles(this.files);
+    });
+}
 
 function preventDefaults(e) {
     e.preventDefault();
     e.stopPropagation();
 }
 
-['dragenter', 'dragover'].forEach(eventName => {
-    uploadBox.addEventListener(eventName, () => uploadBox.classList.add('dragover'), false);
-});
-
-['dragleave', 'drop'].forEach(eventName => {
-    uploadBox.addEventListener(eventName, () => uploadBox.classList.remove('dragover'), false);
-});
-
-uploadBox.addEventListener('drop', (e) => {
-    let dt = e.dataTransfer;
-    let files = dt.files;
-    handleFiles(files);
-});
-
-fileInput.addEventListener('change', function() {
-    handleFiles(this.files);
-});
-
 function handleFiles(files) {
     if (files.length > 0) {
         const file = files[0];
-        dataStatus.textContent = 'Procesando...';
-        dataStatus.className = 'status-badge empty';
+        if (dataStatus) {
+            dataStatus.textContent = 'Procesando...';
+            dataStatus.className = 'status-badge empty';
+        }
         
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -272,7 +290,6 @@ function processExcel(data) {
 
         const headers = jsonData[0];
         
-        // Búsqueda robusta por nombre de columna
         const colFecha = findCol(headers, ['Fecha de emisión', 'Fecha', 'Emision']);
         const colFactura = findCol(headers, ['Nro. comprobante', 'Comprobante', 'Factura', 'Nro']);
         const colComercialCode = findCol(headers, ['Cód. vendedor', 'Codigo vendedor', 'Cod vendedor']);
@@ -293,7 +310,6 @@ function processExcel(data) {
             const fechaRaw = colFecha >= 0 ? row[colFecha] : null;
             const facturaVal = colFactura >= 0 ? row[colFactura] : null;
 
-            // Excluir filas de totales o vacías
             if (!fechaRaw && !facturaVal) continue;
             
             const comercialRaw = colComercial >= 0 ? (row[colComercial] || '').toString().trim() : '';
@@ -343,27 +359,33 @@ function processExcel(data) {
         
         if (globalData.length === 0) {
             alert("No se encontraron registros válidos. Verifica que las columnas del Excel coincidan.");
-            dataStatus.textContent = 'Sin datos compatibles';
+            if (dataStatus) dataStatus.textContent = 'Sin datos compatibles';
             return;
         }
 
         updateMonthFilter();
 
-        dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
-        dataStatus.className = 'status-badge loaded';
-        document.getElementById('btnClearData').classList.remove('hidden');
-        document.getElementById('btnExportRemote').classList.remove('hidden');
+        if (dataStatus) {
+            dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
+            dataStatus.className = 'status-badge loaded';
+        }
+        const btnClear = document.getElementById('btnClearData');
+        const btnExport = document.getElementById('btnExportRemote');
+        if (btnClear) btnClear.classList.remove('hidden');
+        if (btnExport) btnExport.classList.remove('hidden');
         
-        uploadOverlay.classList.add('hidden');
-        views[currentView].classList.remove('hidden');
+        if (uploadOverlay) uploadOverlay.classList.add('hidden');
+        if (views[currentView]) views[currentView].classList.remove('hidden');
         
         renderDashboard();
         
     } catch (e) {
         console.error(e);
         alert("Error al procesar el archivo Excel. Revisa el formato.");
-        dataStatus.textContent = 'Error';
-        dataStatus.className = 'status-badge empty';
+        if (dataStatus) {
+            dataStatus.textContent = 'Error';
+            dataStatus.className = 'status-badge empty';
+        }
     }
 }
 
@@ -371,13 +393,14 @@ function processExcel(data) {
 const formatCurrency = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
 const formatNumber = (val) => new Intl.NumberFormat('es-AR').format(val);
 
-// Chart Instances
 let clientHistoryChartInst = null;
 let monthlyRevenueChartInst = null;
 let comercialRevenueChartInst = null;
 
-Chart.defaults.color = '#94a3b8';
-Chart.defaults.font.family = "'Inter', sans-serif";
+if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+}
 
 function renderDashboard() {
     let totalRevenue = 0;
@@ -402,155 +425,62 @@ function renderDashboard() {
         prodStats[row.producto] += row.cantidad;
     });
 
-    document.getElementById('kpiTotalRevenue').textContent = formatCurrency(totalRevenue);
-    document.getElementById('kpiTotalClients').textContent = clients.size;
-    document.getElementById('kpiTotalItems').textContent = formatNumber(totalItems);
+    const elRev = document.getElementById('kpiTotalRevenue');
+    const elCli = document.getElementById('kpiTotalClients');
+    const elItm = document.getElementById('kpiTotalItems');
+    if (elRev) elRev.textContent = formatCurrency(totalRevenue);
+    if (elCli) elCli.textContent = clients.size;
+    if (elItm) elItm.textContent = formatNumber(totalItems);
     
     let topComercial = Object.entries(comercialStats).sort((a,b) => b[1]-a[1])[0];
-    document.getElementById('kpiTopComercial').textContent = topComercial ? topComercial[0] : '-';
+    const elTopCom = document.getElementById('kpiTopComercial');
+    if (elTopCom) elTopCom.textContent = topComercial ? topComercial[0] : '-';
 
     let topClient = Object.entries(clientStats).sort((a,b) => b[1]-a[1])[0];
-    document.getElementById('kpiTopClient').textContent = topClient ? topClient[0] : '-';
+    const elTopCli = document.getElementById('kpiTopClient');
+    if (elTopCli) elTopCli.textContent = topClient ? topClient[0] : '-';
 
     let topProduct = Object.entries(prodStats).sort((a,b) => b[1]-a[1])[0];
-    document.getElementById('kpiTopProduct').textContent = topProduct ? topProduct[0] : '-';
+    const elTopProd = document.getElementById('kpiTopProduct');
+    if (elTopProd) elTopProd.textContent = topProduct ? topProduct[0] : '-';
 
     const tb = document.querySelector('#mainDetailTable tbody');
-    tb.innerHTML = '';
-    
-    let groupedData = {};
-    let comercialClientStats = {};
-    let allProdStats = {};
-    
-    let allGlobalMonths = [...new Set(rawGlobalData.map(r => r.mes))].sort();
-    const globalMonthFilter = document.getElementById('monthFilter').value;
-    let currentMonth = globalMonthFilter !== 'ALL' ? globalMonthFilter : allGlobalMonths[allGlobalMonths.length - 1];
-    let prevMonth = '';
-    const currentIndex = allGlobalMonths.indexOf(currentMonth);
-    if (currentIndex > 0) prevMonth = allGlobalMonths[currentIndex - 1];
+    if (tb) {
+        tb.innerHTML = '';
+        let groupedData = {};
+        globalData.forEach(row => {
+            let key = row.id_cliente + '|' + row.producto;
+            if (!groupedData[key]) {
+                groupedData[key] = {
+                    id: row.id_cliente,
+                    cliente: row.cliente,
+                    comercial: row.comercial,
+                    producto: row.producto,
+                    cantidad: 0,
+                    total: 0
+                };
+            }
+            groupedData[key].cantidad += row.cantidad;
+            groupedData[key].total += row.facturacion;
+        });
 
-    rawGlobalData.forEach(row => {
-        if (!allProdStats[row.producto]) allProdStats[row.producto] = { current: 0, prev: 0, clients: {} };
-        
-        let clientKey = row.cliente;
-        if (!allProdStats[row.producto].clients[clientKey]) {
-            allProdStats[row.producto].clients[clientKey] = { current: 0, prev: 0 };
-        }
-        
-        if (row.mes === currentMonth) {
-            allProdStats[row.producto].current += row.cantidad;
-            allProdStats[row.producto].clients[clientKey].current += row.cantidad;
-        }
-        if (row.mes === prevMonth) {
-            allProdStats[row.producto].prev += row.cantidad;
-            allProdStats[row.producto].clients[clientKey].prev += row.cantidad;
-        }
-    });
-
-    globalData.forEach(row => {
-        let key = row.id_cliente + '|' + row.producto;
-        if (!groupedData[key]) {
-            groupedData[key] = {
-                id: row.id_cliente,
-                cliente: row.cliente,
-                comercial: row.comercial,
-                producto: row.producto,
-                cantidad: 0,
-                total: 0
-            };
-        }
-        groupedData[key].cantidad += row.cantidad;
-        groupedData[key].total += row.facturacion;
-
-        let comercialKey = row.comercial;
-        if (!comercialClientStats[comercialKey]) comercialClientStats[comercialKey] = {};
-        if (!comercialClientStats[comercialKey][row.cliente]) comercialClientStats[comercialKey][row.cliente] = 0;
-        comercialClientStats[comercialKey][row.cliente] += row.facturacion;
-    });
-
-    let tableRows = Object.values(groupedData).sort((a, b) => b.total - a.total);
-
-    tableRows.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><span class="badge" style="background:rgba(59, 130, 246, 0.1); color:var(--primary)">${item.id}</span></td>
-            <td style="font-weight:500;">${item.cliente}</td>
-            <td>${item.comercial}</td>
-            <td>${item.producto}</td>
-            <td>${formatNumber(item.cantidad)}</td>
-            <td style="font-weight:600; color:var(--success)">${formatCurrency(item.total)}</td>
-        `;
-        tb.appendChild(tr);
-    });
-
-    const tbComercialClients = document.querySelector('#topClientsComercialTable tbody');
-    tbComercialClients.innerHTML = '';
-    
-    let comercialClientList = [];
-    for (let comercial in comercialClientStats) {
-        let clientsInComercial = Object.entries(comercialClientStats[comercial]).sort((a,b) => b[1]-a[1]);
-        clientsInComercial.forEach(clientArr => {
-             comercialClientList.push({ comercial: comercial, client: clientArr[0], val: clientArr[1] });
+        let tableRows = Object.values(groupedData).sort((a, b) => b.total - a.total);
+        tableRows.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="badge" style="background:rgba(59, 130, 246, 0.1); color:var(--primary)">${item.id}</span></td>
+                <td style="font-weight:500;">${item.cliente}</td>
+                <td>${item.comercial}</td>
+                <td>${item.producto}</td>
+                <td>${formatNumber(item.cantidad)}</td>
+                <td style="font-weight:600; color:var(--success)">${formatCurrency(item.total)}</td>
+            `;
+            tb.appendChild(tr);
         });
     }
-    comercialClientList.sort((a,b) => a.comercial.localeCompare(b.comercial) || b.val - a.val).forEach(item => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="font-weight: 500;">${item.comercial}</td>
-            <td>${item.client}</td>
-            <td style="font-weight: 600; color:var(--primary)">${formatCurrency(item.val)}</td>
-        `;
-        tbComercialClients.appendChild(tr);
-    });
-
-    const tbProd = document.querySelector('#productsTrendTable tbody');
-    tbProd.innerHTML = '';
-    
-    let prodList = Object.entries(allProdStats).map(([p, data]) => {
-        return { name: p, current: data.current, prev: data.prev, clients: data.clients };
-    }).sort((a,b) => b.current - a.current);
-
-    window.productDropData = {};
-
-    prodList.forEach(item => {
-        const tr = document.createElement('tr');
-        let trendHtml = '-';
-        if (item.prev > 0) {
-            let trend = ((item.current - item.prev) / item.prev) * 100;
-            if (trend > 0) trendHtml = `<span style="color:var(--success)">+${trend.toFixed(1)}% <i data-lucide="arrow-up" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>`;
-            else if (trend < 0) trendHtml = `<span style="color:var(--danger)">${trend.toFixed(1)}% <i data-lucide="arrow-down" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>`;
-        } else if (item.current > 0 && item.prev === 0) {
-            trendHtml = `<span style="color:var(--success)">Nuevo <i data-lucide="arrow-up" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>`;
-        } else if (item.current === 0 && item.prev > 0) {
-            trendHtml = `<span style="color:var(--danger)">Sin ventas <i data-lucide="arrow-down" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>`;
-        }
-
-        let droppingClients = [];
-        for (let c in item.clients) {
-            let cData = item.clients[c];
-            if (cData.prev > 0 && cData.current < cData.prev) {
-                droppingClients.push({ client: c, prev: cData.prev, current: cData.current, diff: cData.current - cData.prev });
-            }
-        }
-        droppingClients.sort((a,b) => a.diff - b.diff);
-        
-        let actionHtml = '';
-        if (droppingClients.length > 0) {
-            window.productDropData[item.name] = droppingClients;
-            actionHtml = `<button onclick="showProductDropModal('${item.name.replace(/'/g, "\\'")}')" class="btn-icon" style="background:none; border:none; color:var(--warning); cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Ver clientes que dejaron de comprar"><i data-lucide="users" style="width:16px;height:16px;"></i></button>`;
-        }
-
-        tr.innerHTML = `
-            <td>${actionHtml}</td>
-            <td style="font-weight: 500;">${item.name}</td>
-            <td>${formatNumber(item.current)}</td>
-            <td>${trendHtml}</td>
-        `;
-        tbProd.appendChild(tr);
-    });
 
     renderCharts(comercialStats);
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function renderCharts(comercialStats) {
@@ -562,72 +492,248 @@ function renderCharts(comercialStats) {
     let months = Object.keys(revByMonth).sort();
     let revData = months.map(m => revByMonth[m]);
 
-    if (monthlyRevenueChartInst) monthlyRevenueChartInst.destroy();
-    monthlyRevenueChartInst = new Chart(document.getElementById('monthlyRevenueChart'), {
-        type: 'line',
-        data: {
-            labels: months,
-            datasets: [{
-                label: 'Facturación ($)',
-                data: revData,
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                borderWidth: 2,
-                pointBackgroundColor: '#10b981',
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                x: { grid: { display: false } }
+    const ctxMonth = document.getElementById('monthlyRevenueChart');
+    if (ctxMonth && typeof Chart !== 'undefined') {
+        if (monthlyRevenueChartInst) monthlyRevenueChartInst.destroy();
+        monthlyRevenueChartInst = new Chart(ctxMonth, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Facturación ($)',
+                    data: revData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#10b981',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
             }
-        }
-    });
+        });
+    }
 
     let comercialLabels = Object.keys(comercialStats);
     let comercialData = Object.values(comercialStats);
 
-    if (comercialRevenueChartInst) comercialRevenueChartInst.destroy();
-    comercialRevenueChartInst = new Chart(document.getElementById('comercialRevenueChart'), {
-        type: 'doughnut',
-        data: {
-            labels: comercialLabels,
-            datasets: [{
-                data: comercialData,
-                backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { 
-                legend: { 
-                    position: 'bottom',
-                    labels: { color: '#f8fafc' }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed !== null) {
-                                let total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                let percentage = ((context.parsed * 100) / total).toFixed(1) + '%';
-                                label += formatCurrency(context.parsed) + ' (' + percentage + ')';
+    const ctxCom = document.getElementById('comercialRevenueChart');
+    if (ctxCom && typeof Chart !== 'undefined') {
+        if (comercialRevenueChartInst) comercialRevenueChartInst.destroy();
+        comercialRevenueChartInst = new Chart(ctxCom, {
+            type: 'doughnut',
+            data: {
+                labels: comercialLabels,
+                datasets: [{
+                    data: comercialData,
+                    backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { 
+                        position: 'bottom',
+                        labels: { color: '#f8fafc' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed !== null) {
+                                    let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    let percentage = ((context.parsed * 100) / total).toFixed(1) + '%';
+                                    label += formatCurrency(context.parsed) + ' (' + percentage + ')';
+                                }
+                                return label;
                             }
-                            return label;
                         }
                     }
+                },
+                cutout: '70%'
+            }
+        });
+    }
+}
+
+// BÚSQUEDA CORREGIDA DE CLIENTES (Insensible a acentos y mayúsculas)
+const searchSuggestions = document.getElementById('searchSuggestions');
+const clientSearchInput = document.getElementById('clientSearchInput');
+
+function normalizeText(str) {
+    if (!str) return '';
+    return str.toString().toLowerCase().trim()
+        .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
+}
+
+if (clientSearchInput) {
+    clientSearchInput.addEventListener('input', (e) => {
+        const term = normalizeText(e.target.value);
+        if (term.length < 2) {
+            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+            return;
+        }
+
+        const clientsMap = new Map();
+        rawGlobalData.forEach(r => {
+            const clienteNorm = normalizeText(r.cliente);
+            const idNorm = normalizeText(r.id_cliente);
+            if (clienteNorm.includes(term) || idNorm.includes(term)) {
+                if (!clientsMap.has(r.id_cliente)) {
+                    clientsMap.set(r.id_cliente, r.cliente);
                 }
-            },
-            cutout: '70%'
+            }
+        });
+
+        const suggestions = Array.from(clientsMap.entries()).slice(0, 10);
+
+        if (suggestions.length === 0) {
+            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+            return;
+        }
+
+        if (searchSuggestions) {
+            searchSuggestions.innerHTML = '';
+            suggestions.forEach(([id, name]) => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerHTML = `<span class="client-id">${id}</span><span class="client-name">${name}</span>`;
+                div.addEventListener('click', () => {
+                    clientSearchInput.value = name;
+                    searchSuggestions.classList.add('hidden');
+                    searchClient();
+                });
+                searchSuggestions.appendChild(div);
+            });
+            searchSuggestions.classList.remove('hidden');
         }
     });
+
+    document.addEventListener('click', (e) => {
+        if (searchSuggestions && !clientSearchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+            searchSuggestions.classList.add('hidden');
+        }
+    });
+
+    clientSearchInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+            searchClient();
+        }
+    });
+}
+
+const btnSearchClient = document.getElementById('btnSearchClient');
+if (btnSearchClient) {
+    btnSearchClient.addEventListener('click', searchClient);
+}
+
+function searchClient() {
+    if (!clientSearchInput) return;
+    const term = normalizeText(clientSearchInput.value);
+    if (!term) return;
+
+    const clientRows = globalData.filter(r => normalizeText(r.id_cliente).includes(term) || normalizeText(r.cliente).includes(term));
+    
+    const emptyState = document.getElementById('clientEmptyState');
+    const details = document.getElementById('clientDetails');
+
+    if (clientRows.length === 0) {
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+            emptyState.innerHTML = `<i data-lucide="search-x"></i><p>No se encontraron compras para el cliente: <b>${clientSearchInput.value}</b></p>`;
+        }
+        if (details) details.classList.add('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+    if (details) details.classList.remove('hidden');
+
+    const info = clientRows[0];
+    const elName = document.getElementById('cdName');
+    const elId = document.getElementById('cdId');
+    const elCom = document.getElementById('cdComercial');
+    if (elName) elName.textContent = info.cliente;
+    if (elId) elId.textContent = info.id_cliente;
+    if (elCom) elCom.innerHTML = `<i data-lucide="briefcase"></i> ${info.comercial}`;
+
+    let totalRev = 0;
+    let monthStats = {};
+    let prodStats = {};
+    let invoices = new Set();
+
+    clientRows.forEach(r => {
+        totalRev += r.facturacion;
+        monthStats[r.mes] = (monthStats[r.mes] || 0) + r.facturacion;
+        
+        let invoiceKey = '';
+        if (r.factura && r.factura !== 'S/F' && r.factura.trim() !== '') {
+            invoiceKey = r.factura;
+        } else if (r.fecha_raw && r.fecha_raw !== 'S/F') {
+            invoiceKey = r.fecha_raw;
+        } else {
+            invoiceKey = 'row_' + Math.random();
+        }
+        invoices.add(invoiceKey);
+        
+        if (!prodStats[r.producto]) prodStats[r.producto] = { qty: 0, byMonth: {}, lastMonth: '' };
+        prodStats[r.producto].qty += r.cantidad;
+        if (!prodStats[r.producto].byMonth[r.mes]) prodStats[r.producto].byMonth[r.mes] = 0;
+        prodStats[r.producto].byMonth[r.mes] += r.cantidad;
+        
+        if (r.mes > prodStats[r.producto].lastMonth) prodStats[r.producto].lastMonth = r.mes;
+    });
+
+    const elTot = document.getElementById('cdTotal');
+    const elAvg = document.getElementById('cdAverageTicket');
+    const elMix = document.getElementById('cdMixProductos');
+    if (elTot) elTot.textContent = formatCurrency(totalRev);
+    let avgTicket = invoices.size > 0 ? totalRev / invoices.size : 0;
+    if (elAvg) elAvg.textContent = formatCurrency(avgTicket);
+    if (elMix) elMix.textContent = Object.keys(prodStats).length;
+
+    const months = Object.keys(monthStats).sort();
+    const revData = months.map(m => monthStats[m]);
+
+    const ctxHist = document.getElementById('clientHistoryChart');
+    if (ctxHist && typeof Chart !== 'undefined') {
+        if (clientHistoryChartInst) clientHistoryChartInst.destroy();
+        clientHistoryChartInst = new Chart(ctxHist, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Compras',
+                    data: revData,
+                    backgroundColor: '#35A29F',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
