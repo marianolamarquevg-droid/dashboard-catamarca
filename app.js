@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // Aplicar estilo de una sola línea al input de búsqueda de cliente
+    // Estilo de una sola línea para el input de búsqueda
     const clientSearchInput = document.getElementById('clientSearchInput');
     if (clientSearchInput) {
         clientSearchInput.style.height = '48px';
@@ -767,6 +767,30 @@ function searchClient() {
     let avgTicket = invoices.size > 0 ? totalRev / invoices.size : 0;
     if (elAvg) elAvg.textContent = formatCurrency(avgTicket);
     if (elMix) elMix.textContent = Object.keys(prodStats).length;
+
+    // RENDERIZAR TABLA DE PRODUCTOS CONSUMIDOS DEL CLIENTE
+    let productsTableBody = document.querySelector('#clientDetails table tbody') || document.querySelector('#clientProductsTable tbody');
+    if (!productsTableBody) {
+        // Si no encuentra el tbody específico, buscamos la tabla dentro de clientDetails
+        const clientTable = details.querySelector('table');
+        if (clientTable) {
+            productsTableBody = clientTable.querySelector('tbody') || clientTable;
+        }
+    }
+
+    if (productsTableBody) {
+        productsTableBody.innerHTML = '';
+        let sortedProducts = Object.entries(prodStats).sort((a, b) => b[1].qty - a[1].qty);
+        
+        sortedProducts.forEach(([prodName, pData]) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff;">${prodName}</td>
+                <td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; font-weight: 600; color: #10b981;">${formatNumber(pData.qty)}</td>
+            `;
+            productsTableBody.appendChild(tr);
+        });
+    }
 
     const months = Object.keys(monthStats).sort();
     const revData = months.map(m => monthStats[m]);
