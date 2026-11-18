@@ -93,6 +93,40 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
+    // Inyectar estilos CSS responsivos para asegurar que en celulares no se amontone nada
+    const mobileStyle = document.createElement('style');
+    mobileStyle.innerHTML = `
+        @media (max-width: 768px) {
+            #clientDetails {
+                padding: 10px !important;
+                max-height: 90vh !important;
+                overflow-y: auto !important;
+            }
+            #clientDetails > div, #clientDetails .flex, #clientDetails header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+            }
+            #cdName {
+                font-size: 1.2rem !important;
+                line-height: 1.3 !important;
+                margin-bottom: 10px !important;
+            }
+            .kpi-container, #clientDetails .grid {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+            #cdTotal, #cdAverageTicket, #cdMixProductos {
+                font-size: 1.1rem !important;
+            }
+            #clientSearchInput {
+                height: 44px !important;
+                font-size: 16px !important;
+            }
+        }
+    `;
+    document.head.appendChild(mobileStyle);
+
     const clientSearchInput = document.getElementById('clientSearchInput');
     if (clientSearchInput) {
         clientSearchInput.style.height = '44px';
@@ -740,7 +774,7 @@ function searchClient() {
     const isMobile = window.innerWidth <= 768;
     if (elName) {
         elName.textContent = info.cliente;
-        elName.style.fontSize = isMobile ? '1.3rem' : '2rem';
+        elName.style.fontSize = isMobile ? '1.2rem' : '2rem';
     }
     if (elId) elId.textContent = info.id_cliente;
     if (elCom) elCom.innerHTML = `<i data-lucide="briefcase"></i> ${info.comercial}`;
