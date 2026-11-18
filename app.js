@@ -5,7 +5,7 @@ lucide.createIcons();
 let rawGlobalData = [];
 let globalData = [];
 let currentView = 'dashboard';
-let lockedComercial = null; // Nueva variable para bloquear vista por vendedor
+let lockedComercial = null; // Variable para bloquear vista por vendedor
 
 // IndexedDB Persistence
 const DB_NAME = 'SalesDB_v4';
@@ -62,10 +62,8 @@ function loadFromDB() {
                     if (r.transporte && !r.comercial) r.comercial = r.transporte;
                 });
 
-                // Si hay un vendedor bloqueado, filtramos todo de entrada
                 if (lockedComercial) {
                     rawGlobalData = rawGlobalData.filter(r => r.comercial && r.comercial.includes(`(${lockedComercial})`));
-                    console.log('Datos filtrados para el comercial:', lockedComercial, rawGlobalData.length);
                 }
 
                 globalData = [...rawGlobalData];
@@ -83,9 +81,8 @@ function loadFromDB() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    checkLockedComercial(); // Verificar si viene con link de vendedor
     loadFromDB();
-    checkRemoteData(); // Nueva función para buscar datos en la nube
+    checkRemoteData(); 
     const btnClear = document.getElementById('btnClearData');
     if (btnClear) {
         btnClear.addEventListener('click', () => {
@@ -122,19 +119,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const REMOTE_DATA_URL = './data.json';
 
-// Nueva función para buscar datos en el servidor (GitHub Pages)
 async function checkRemoteData() {
     try {
-        const response = await fetch(REMOTE_DATA_URL + '?t=' + new Date().getTime()); // Evitar caché
+        const response = await fetch(REMOTE_DATA_URL + '?t=' + new Date().getTime());
         if (response.ok) {
             const remoteData = await response.json();
             if (remoteData && remoteData.length > 0) {
-                console.log('Datos remotos encontrados:', remoteData.length);
-                // Si encontramos datos remotos, los usamos
                 rawGlobalData = remoteData;
                 if (lockedComercial) {
                     rawGlobalData = rawGlobalData.filter(r => r.comercial && r.comercial.includes(`(${lockedComercial})`));
-                    console.log('Datos remotos filtrados para:', lockedComercial);
                 }
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
@@ -153,7 +146,6 @@ async function checkRemoteData() {
     }
 }
 
-// Nueva función para exportar datos procesados a JSON
 function exportDataForMobile() {
     if (rawGlobalData.length === 0) return;
     
@@ -253,19 +245,22 @@ function handleFiles(files) {
 
 function normalizeHeader(header) {
     if (!header) return '';
-    return header.toString().toLowerCase().trim().replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
+    return header.toString().toLowerCase().trim()
+        .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+        .replace(/\./g, '');
 }
 
 function findCol(headers, possibleNames) {
     for (let i = 0; i < headers.length; i++) {
         const h = normalizeHeader(headers[i]);
         for (let name of possibleNames) {
-            if (h.includes(name)) return i;
+            if (h.includes(normalizeHeader(name))) return i;
         }
     }
     return -1;
 }
 
+// PROCESAMIENTO DINÁMICO CORREGIDO PARA EVITAR CEROS
 function processExcel(data) {
     try {
         const workbook = XLSX.read(data, { type: 'array' });
@@ -277,15 +272,16 @@ function processExcel(data) {
 
         const headers = jsonData[0];
         
-        // Columnas para Catamarca
-        const colId = 6;      // Columna G: Cód. cliente
-        const colCliente = 7; // Columna H: Razón social
-        const colProd = 10;   // Columna K: Descripción
-        const colComercial = 4; // Columna E: Nombre Vendedor
-        const colFactura = 2; // Columna C: Nro. comprobante
-        const colFecha = 0;   // Columna A: Fecha de emisión
-        const colCant = 13;   // Columna N: Cantidad
-        const colFact = 14;   // Columna O: Total (Sin IVA o con IVA, según el reporte)
+        // Búsqueda robusta por nombre de columna
+        const colFecha = findCol(headers, ['Fecha de emisión', 'Fecha', 'Emision']);
+        const colFactura = findCol(headers, ['Nro. comprobante', 'Comprobante', 'Factura', 'Nro']);
+        const colComercialCode = findCol(headers, ['Cód. vendedor', 'Codigo vendedor', 'Cod vendedor']);
+        const colComercial = findCol(headers, ['Nombre Vendedor', 'Vendedor']);
+        const colId = findCol(headers, ['Cód. cliente', 'Codigo cliente', 'Cod cliente']);
+        const colCliente = findCol(headers, ['Razón social', 'Razon social', 'Cliente']);
+        const colProd = findCol(headers, ['Descripción', 'Descripcion', 'Articulo', 'Producto']);
+        const colCant = findCol(headers, ['Cantidad']);
+        const colFact = findCol(headers, ['Total', 'Importe', 'Neto']);
 
         let validData = [];
         let monthsSet = new Set();
@@ -294,23 +290,25 @@ function processExcel(data) {
             const row = jsonData[i];
             if (!row || row.length === 0) continue;
             
-            // Excluir filas de totales (sin fecha ni número de comprobante)
-            if (!row[colFecha] && !row[colFactura]) continue;
+            const fechaRaw = colFecha >= 0 ? row[colFecha] : null;
+            const facturaVal = colFactura >= 0 ? row[colFactura] : null;
+
+            // Excluir filas de totales o vacías
+            if (!fechaRaw && !facturaVal) continue;
             
-            const comercialRaw = (row[colComercial] || '').toString().trim();
-            const comercialCode = (row[colComercial - 1] || '').toString().trim(); // Columna D: Cód. vendedor
+            const comercialRaw = colComercial >= 0 ? (row[colComercial] || '').toString().trim() : '';
+            const comercialCode = colComercialCode >= 0 ? (row[colComercialCode] || '').toString().trim() : '';
             let nombreComercial = comercialRaw;
             
-            if (comercialCode) {
+            if (comercialCode && !nombreComercial.includes(comercialCode)) {
                 nombreComercial = `${comercialRaw} (${comercialCode})`;
             }
             
-            if (!nombreComercial || nombreComercial.toLowerCase().includes('diego')) {
+            if (!nombreComercial || nombreComercial.toLowerCase().includes('diego') || nombreComercial === '') {
                 nombreComercial = 'Sin Asignar';
             }
             
             if (nombreComercial !== 'Sin Asignar') {
-                let fechaRaw = row[colFecha];
                 let mes = 'Desconocido';
                 if (fechaRaw) {
                     if (typeof fechaRaw === 'number') {
@@ -325,27 +323,26 @@ function processExcel(data) {
 
                 validData.push({
                     comercial: nombreComercial,
-                    id_cliente: colId >= 0 ? String(row[colId]) : 'S/ID',
-                    cliente: colCliente >= 0 ? String(row[colCliente]) : 'Cliente Desconocido',
-                    localidad: 'Catamarca', // Valor por defecto si no hay columna
-                    producto: colProd >= 0 ? String(row[colProd]) : 'Producto Gral',
+                    id_cliente: colId >= 0 ? String(row[colId] || 'S/ID') : 'S/ID',
+                    cliente: colCliente >= 0 ? String(row[colCliente] || 'Cliente Desconocido') : 'Cliente Desconocido',
+                    localidad: 'Catamarca',
+                    producto: colProd >= 0 ? String(row[colProd] || 'Producto Gral') : 'Producto Gral',
                     cantidad: colCant >= 0 ? parseFloat(row[colCant]) || 0 : 0,
                     facturacion: colFact >= 0 ? parseFloat(row[colFact]) || 0 : 0,
                     mes: mes,
-                    factura: colFactura >= 0 ? String(row[colFactura]) : 'S/F',
+                    factura: facturaVal ? String(facturaVal) : 'S/F',
                     fecha_raw: fechaRaw || 'S/F'
                 });
             }
         }
 
-        // Replace existing data instead of merging to avoid duplication
         rawGlobalData = validData;
         globalData = [...rawGlobalData];
         
         saveToDB(rawGlobalData);
         
         if (globalData.length === 0) {
-            alert("No se encontraron registros válidos en el archivo.");
+            alert("No se encontraron registros válidos. Verifica que las columnas del Excel coincidan.");
             dataStatus.textContent = 'Sin datos compatibles';
             return;
         }
@@ -395,20 +392,16 @@ function renderDashboard() {
         totalItems += row.cantidad;
         clients.add(row.id_cliente);
 
-        // Comerciales
         let c = row.comercial;
         comercialStats[c] = (comercialStats[c] || 0) + row.facturacion;
 
-        // Cliente Stats (para mejor cliente)
         if (!clientStats[row.cliente]) clientStats[row.cliente] = 0;
         clientStats[row.cliente] += row.facturacion;
 
-        // Productos Stats (para producto estrella)
         if (!prodStats[row.producto]) prodStats[row.producto] = 0;
         prodStats[row.producto] += row.cantidad;
     });
 
-    // Update KPIs
     document.getElementById('kpiTotalRevenue').textContent = formatCurrency(totalRevenue);
     document.getElementById('kpiTotalClients').textContent = clients.size;
     document.getElementById('kpiTotalItems').textContent = formatNumber(totalItems);
@@ -422,16 +415,13 @@ function renderDashboard() {
     let topProduct = Object.entries(prodStats).sort((a,b) => b[1]-a[1])[0];
     document.getElementById('kpiTopProduct').textContent = topProduct ? topProduct[0] : '-';
 
-    // Main Detailed Table
     const tb = document.querySelector('#mainDetailTable tbody');
     tb.innerHTML = '';
     
-    // Group by Client and Product
     let groupedData = {};
     let comercialClientStats = {};
-    let allProdStats = {}; // para la tabla de tendencia de productos
+    let allProdStats = {};
     
-    // Determine current and prev month for product trend
     let allGlobalMonths = [...new Set(rawGlobalData.map(r => r.mes))].sort();
     const globalMonthFilter = document.getElementById('monthFilter').value;
     let currentMonth = globalMonthFilter !== 'ALL' ? globalMonthFilter : allGlobalMonths[allGlobalMonths.length - 1];
@@ -440,7 +430,6 @@ function renderDashboard() {
     if (currentIndex > 0) prevMonth = allGlobalMonths[currentIndex - 1];
 
     rawGlobalData.forEach(row => {
-        // Para productos (comparando meses)
         if (!allProdStats[row.producto]) allProdStats[row.producto] = { current: 0, prev: 0, clients: {} };
         
         let clientKey = row.cliente;
@@ -459,7 +448,6 @@ function renderDashboard() {
     });
 
     globalData.forEach(row => {
-        // Para Main Table
         let key = row.id_cliente + '|' + row.producto;
         if (!groupedData[key]) {
             groupedData[key] = {
@@ -474,7 +462,6 @@ function renderDashboard() {
         groupedData[key].cantidad += row.cantidad;
         groupedData[key].total += row.facturacion;
 
-        // Para Top Clientes por Comercial
         let comercialKey = row.comercial;
         if (!comercialClientStats[comercialKey]) comercialClientStats[comercialKey] = {};
         if (!comercialClientStats[comercialKey][row.cliente]) comercialClientStats[comercialKey][row.cliente] = 0;
@@ -496,7 +483,6 @@ function renderDashboard() {
         tb.appendChild(tr);
     });
 
-    // Renderizar Top 10 Clientes por Comercial
     const tbComercialClients = document.querySelector('#topClientsComercialTable tbody');
     tbComercialClients.innerHTML = '';
     
@@ -517,7 +503,6 @@ function renderDashboard() {
         tbComercialClients.appendChild(tr);
     });
 
-    // Renderizar Productos (Tendencia)
     const tbProd = document.querySelector('#productsTrendTable tbody');
     tbProd.innerHTML = '';
     
@@ -525,7 +510,7 @@ function renderDashboard() {
         return { name: p, current: data.current, prev: data.prev, clients: data.clients };
     }).sort((a,b) => b.current - a.current);
 
-    window.productDropData = {}; // Store for modal
+    window.productDropData = {};
 
     prodList.forEach(item => {
         const tr = document.createElement('tr');
@@ -547,7 +532,7 @@ function renderDashboard() {
                 droppingClients.push({ client: c, prev: cData.prev, current: cData.current, diff: cData.current - cData.prev });
             }
         }
-        droppingClients.sort((a,b) => a.diff - b.diff); // largest drop first
+        droppingClients.sort((a,b) => a.diff - b.diff);
         
         let actionHtml = '';
         if (droppingClients.length > 0) {
@@ -564,14 +549,11 @@ function renderDashboard() {
         tbProd.appendChild(tr);
     });
 
-    // Renderizar Gráficos
     renderCharts(comercialStats);
-
     lucide.createIcons();
 }
 
 function renderCharts(comercialStats) {
-    // Evolución de Facturación Mensual (Líneas)
     let revByMonth = {};
     rawGlobalData.forEach(r => {
         revByMonth[r.mes] = (revByMonth[r.mes] || 0) + r.facturacion;
@@ -588,7 +570,7 @@ function renderCharts(comercialStats) {
             datasets: [{
                 label: 'Facturación ($)',
                 data: revData,
-                borderColor: '#10b981', // success color
+                borderColor: '#10b981',
                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
                 borderWidth: 2,
                 pointBackgroundColor: '#10b981',
@@ -607,7 +589,6 @@ function renderCharts(comercialStats) {
         }
     });
 
-    // Facturación por Comercial (Anillos)
     let comercialLabels = Object.keys(comercialStats);
     let comercialData = Object.values(comercialStats);
 
@@ -635,9 +616,7 @@ function renderCharts(comercialStats) {
                     callbacks: {
                         label: function(context) {
                             let label = context.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
+                            if (label) label += ': ';
                             if (context.parsed !== null) {
                                 let total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 let percentage = ((context.parsed * 100) / total).toFixed(1) + '%';
@@ -651,518 +630,4 @@ function renderCharts(comercialStats) {
             cutout: '70%'
         }
     });
-}
-
-
-
-// Client Search View
-const searchSuggestions = document.getElementById('searchSuggestions');
-const clientSearchInput = document.getElementById('clientSearchInput');
-
-clientSearchInput.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase().trim();
-    if (term.length < 2) {
-        searchSuggestions.classList.add('hidden');
-        return;
-    }
-
-    // Get unique clients from rawGlobalData
-    const clientsMap = new Map();
-    rawGlobalData.forEach(r => {
-        if (r.cliente.toLowerCase().includes(term) || String(r.id_cliente).toLowerCase().includes(term)) {
-            if (!clientsMap.has(r.id_cliente)) {
-                clientsMap.set(r.id_cliente, r.cliente);
-            }
-        }
-    });
-
-    const suggestions = Array.from(clientsMap.entries()).slice(0, 10);
-
-    if (suggestions.length === 0) {
-        searchSuggestions.classList.add('hidden');
-        return;
-    }
-
-    searchSuggestions.innerHTML = '';
-    suggestions.forEach(([id, name]) => {
-        const div = document.createElement('div');
-        div.className = 'suggestion-item';
-        div.innerHTML = `<span class="client-id">${id}</span><span class="client-name">${name}</span>`;
-        div.addEventListener('click', () => {
-            clientSearchInput.value = name;
-            searchSuggestions.classList.add('hidden');
-            searchClient();
-        });
-        searchSuggestions.appendChild(div);
-    });
-
-    searchSuggestions.classList.remove('hidden');
-});
-
-// Hide suggestions when clicking outside
-document.addEventListener('click', (e) => {
-    if (!clientSearchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
-        searchSuggestions.classList.add('hidden');
-    }
-});
-
-document.getElementById('btnSearchClient').addEventListener('click', searchClient);
-document.getElementById('clientSearchInput').addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') {
-        searchSuggestions.classList.add('hidden');
-        searchClient();
-    }
-});
-
-function searchClient() {
-    const term = document.getElementById('clientSearchInput').value.toLowerCase().trim();
-    if (!term) return;
-
-    const clientRows = globalData.filter(r => String(r.id_cliente).toLowerCase().includes(term) || r.cliente.toLowerCase().includes(term));
-    
-    if (clientRows.length === 0) {
-        document.getElementById('clientEmptyState').classList.remove('hidden');
-        document.getElementById('clientDetails').classList.add('hidden');
-        document.getElementById('clientEmptyState').innerHTML = `<i data-lucide="search-x"></i><p>No se encontraron compras para el cliente: <b>${term}</b></p>`;
-        lucide.createIcons();
-        return;
-    }
-
-    document.getElementById('clientEmptyState').classList.add('hidden');
-    document.getElementById('clientDetails').classList.remove('hidden');
-
-    // Aggregate client data
-    const info = clientRows[0];
-    document.getElementById('cdName').textContent = info.cliente;
-    document.getElementById('cdId').textContent = info.id_cliente;
-    document.getElementById('cdComercial').innerHTML = `<i data-lucide="briefcase"></i> ${info.comercial}`;
-
-    let totalRev = 0;
-    let monthStats = {};
-    let prodStats = {};
-    let invoices = new Set();
-
-    clientRows.forEach(r => {
-        totalRev += r.facturacion;
-        monthStats[r.mes] = (monthStats[r.mes] || 0) + r.facturacion;
-        
-        let invoiceKey = '';
-        if (r.factura && r.factura !== 'S/F' && r.factura.trim() !== '') {
-            invoiceKey = r.factura;
-        } else if (r.fecha_raw && r.fecha_raw !== 'S/F') {
-            invoiceKey = r.fecha_raw;
-        } else {
-            invoiceKey = 'row_' + Math.random();
-        }
-        invoices.add(invoiceKey);
-        
-        if (!prodStats[r.producto]) prodStats[r.producto] = { qty: 0, byMonth: {}, lastMonth: '' };
-        prodStats[r.producto].qty += r.cantidad;
-        if (!prodStats[r.producto].byMonth[r.mes]) prodStats[r.producto].byMonth[r.mes] = 0;
-        prodStats[r.producto].byMonth[r.mes] += r.cantidad;
-        
-        if (r.mes > prodStats[r.producto].lastMonth) prodStats[r.producto].lastMonth = r.mes;
-    });
-
-    document.getElementById('cdTotal').textContent = formatCurrency(totalRev);
-    let avgTicket = invoices.size > 0 ? totalRev / invoices.size : 0;
-    document.getElementById('cdAverageTicket').textContent = formatCurrency(avgTicket);
-    document.getElementById('cdMixProductos').textContent = Object.keys(prodStats).length;
-
-    // Chart
-    const months = Object.keys(monthStats).sort();
-    const revData = months.map(m => monthStats[m]);
-
-    if (clientHistoryChartInst) clientHistoryChartInst.destroy();
-    clientHistoryChartInst = new Chart(document.getElementById('clientHistoryChart'), {
-        type: 'bar',
-        data: {
-            labels: months,
-            datasets: [{
-                label: 'Compras',
-                data: revData,
-                backgroundColor: '#8b5cf6',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#334155' } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
-
-    // Extract last 6 months globally
-    let allGlobalMonths = [...new Set(rawGlobalData.map(r => r.mes))].sort();
-    let last6Months = allGlobalMonths.slice(-6);
-
-    // Update table header
-    const thd = document.getElementById('clientProductsTableHead');
-    let thHtml = '<tr><th>Producto</th>';
-    last6Months.forEach(m => {
-        thHtml += `<th>${m}</th>`;
-    });
-    thHtml += '<th>Total 6 Meses</th></tr>';
-    thd.innerHTML = thHtml;
-
-    // Products table
-    const tb = document.querySelector('#clientProductsTable tbody');
-    tb.innerHTML = '';
-    
-    Object.keys(prodStats).sort((a,b) => prodStats[b].qty - prodStats[a].qty).forEach(p => {
-        const tr = document.createElement('tr');
-        
-        let total6m = 0;
-        let lastMonthInRecord = last6Months[last6Months.length - 1];
-        let boughtInLastMonth = (prodStats[p].byMonth[lastMonthInRecord] || 0) > 0;
-        let boughtBefore = false;
-
-        let cellsHtml = '';
-        last6Months.forEach(m => {
-            let q = prodStats[p].byMonth[m] || 0;
-            total6m += q;
-            if (m !== lastMonthInRecord && q > 0) boughtBefore = true;
-            if (q === 0) {
-                 cellsHtml += `<td style="color: var(--text-muted); opacity: 0.5;">-</td>`;
-            } else {
-                 cellsHtml += `<td>${formatNumber(q)}</td>`;
-            }
-        });
-
-        let alertHtml = '';
-        if (boughtBefore && !boughtInLastMonth) {
-            alertHtml = ` <span title="Dejó de comprar este producto en el último mes" class="badge" style="background:rgba(245, 158, 11, 0.2); color:var(--warning); padding: 0.1rem 0.3rem;"><i data-lucide="alert-triangle" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>`;
-        }
-
-        tr.innerHTML = `<td style="font-weight: 500;">${p}${alertHtml}</td>${cellsHtml}<td style="font-weight:600; color:var(--primary)">${formatNumber(total6m)}</td>`;
-        tb.appendChild(tr);
-    });
-
-    lucide.createIcons();
-}
-
-// Add event listener for the month filter
-document.getElementById('monthFilter').addEventListener('change', (e) => {
-    const selectedMonth = e.target.value;
-    if (selectedMonth === 'ALL') {
-        globalData = [...rawGlobalData];
-    } else if (selectedMonth.startsWith('LAST_')) {
-        const count = parseInt(selectedMonth.split('_')[1]);
-        let allMonths = Array.from(new Set(rawGlobalData.map(r => r.mes))).sort();
-        let targetMonths = allMonths.slice(-count);
-        globalData = rawGlobalData.filter(r => targetMonths.includes(r.mes));
-    } else {
-        globalData = rawGlobalData.filter(r => r.mes === selectedMonth);
-    }
-    renderDashboard();
-    
-    // Also update client search view if it's currently open and a client was searched
-    if (currentView === 'client-search' && document.getElementById('clientSearchInput').value.trim() !== '') {
-        searchClient();
-    }
-    
-    if (currentView === 'comercial') {
-        renderComercialAnalysis();
-    }
-
-    if (currentView === 'mix') {
-        renderMixView();
-    }
-});
-
-// Override switchView to render Comercial Analysis when clicking the nav link
-const originalSwitchView = switchView;
-switchView = function(viewName) {
-    originalSwitchView(viewName);
-    if (viewName === 'comercial') {
-        renderComercialAnalysis();
-    }
-    if (viewName === 'mix') {
-        renderMixView();
-    }
-};
-
-// Comercial Analysis View
-document.getElementById('comercialSelector').addEventListener('change', renderComercialAnalysis);
-
-function renderComercialAnalysis() {
-    if (rawGlobalData.length === 0) return;
-    
-    // Populate selector
-    const selector = document.getElementById('comercialSelector');
-    const currentSelection = selector.value;
-    
-    // Filter out Diego and any empty values
-    const comerciales = [...new Set(rawGlobalData.map(r => r.comercial))]
-        .filter(c => c && c !== 'undefined' && !c.toLowerCase().includes('diego'))
-        .sort();
-    
-    selector.innerHTML = '';
-    if (comerciales.length === 0) {
-        const opt = document.createElement('option');
-        opt.textContent = 'Sin comerciales disponibles';
-        selector.appendChild(opt);
-        return;
-    }
-
-    comerciales.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        selector.appendChild(opt);
-    });
-    
-    if (currentSelection && comerciales.includes(currentSelection)) {
-        selector.value = currentSelection;
-    }
-
-    const selectedComercial = selector.value;
-    
-    // Determine the "Current Month" to analyze.
-    // If a specific month is selected in the global filter, use that.
-    // Otherwise, use the latest month available in the dataset.
-    const globalMonthFilter = document.getElementById('monthFilter').value;
-    let allGlobalMonths = [...new Set(rawGlobalData.map(r => r.mes))].sort();
-    
-    let currentMonth = globalMonthFilter !== 'ALL' ? (globalMonthFilter.startsWith('LAST_') ? allGlobalMonths[allGlobalMonths.length-1] : globalMonthFilter) : allGlobalMonths[allGlobalMonths.length - 1];
-    
-    // Find the previous month in the dataset
-    let prevMonth = '';
-    const currentIndex = allGlobalMonths.indexOf(currentMonth);
-    if (currentIndex > 0) {
-        prevMonth = allGlobalMonths[currentIndex - 1];
-    }
-    
-    // Group client revenue by month for the selected comercial
-    let clientRev = {};
-    
-    rawGlobalData.forEach(r => {
-        if (r.comercial === selectedComercial && (r.mes === currentMonth || r.mes === prevMonth)) {
-            if (!clientRev[r.cliente]) {
-                clientRev[r.cliente] = { current: 0, prev: 0 };
-            }
-            if (r.mes === currentMonth) clientRev[r.cliente].current += r.facturacion;
-            if (r.mes === prevMonth) clientRev[r.cliente].prev += r.facturacion;
-        }
-    });
-    
-    // Convert to array and sort by current month revenue (Ranking)
-    let ranking = Object.keys(clientRev).map(clientName => {
-        return {
-            name: clientName,
-            current: clientRev[clientName].current,
-            prev: clientRev[clientName].prev
-        };
-    }).sort((a, b) => b.current - a.current);
-    
-    const tb = document.querySelector('#comercialClientsTable tbody');
-    tb.innerHTML = '';
-    
-    ranking.forEach((item, index) => {
-        const tr = document.createElement('tr');
-        
-        let trend = 0;
-        let trendHtml = '-';
-        let statusHtml = '<span class="badge" style="background:rgba(148, 163, 184, 0.2); color:var(--text-muted)">Sin cambios</span>';
-        
-        if (item.prev > 0) {
-            trend = ((item.current - item.prev) / item.prev) * 100;
-            if (trend > 0) {
-                trendHtml = `<span style="color:var(--success)">+${trend.toFixed(1)}%</span>`;
-                statusHtml = '<span class="badge" style="background:rgba(16, 185, 129, 0.2); color:var(--success)">En alza <i data-lucide="trending-up" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>';
-            } else if (trend < 0) {
-                trendHtml = `<span style="color:var(--danger)">${trend.toFixed(1)}%</span>`;
-                statusHtml = '<span class="badge" style="background:rgba(239, 68, 68, 0.2); color:var(--danger)">En baja <i data-lucide="trending-down" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>';
-            }
-        } else if (item.current > 0 && item.prev === 0) {
-            trendHtml = `<span style="color:var(--success)">Nuevo/Recuperado</span>`;
-            statusHtml = '<span class="badge" style="background:rgba(16, 185, 129, 0.2); color:var(--success)">En alza <i data-lucide="trending-up" style="width:14px;height:14px;display:inline;vertical-align:middle"></i></span>';
-        }
-        
-        tr.innerHTML = `
-            <td><strong>#${index + 1}</strong></td>
-            <td style="font-weight: 500;">${item.name}</td>
-            <td style="font-weight: 600; color:var(--text-main)">${formatCurrency(item.current)}</td>
-            <td style="color:var(--text-muted)">${formatCurrency(item.prev)}</td>
-            <td>${trendHtml}</td>
-            <td>${statusHtml}</td>
-        `;
-        tb.appendChild(tr);
-    });
-    
-    lucide.createIcons();
-}
-
-// Modal Handlers
-window.showProductDropModal = function(productName) {
-    const data = window.productDropData[productName] || [];
-    document.getElementById('modalProductTitle').textContent = `Bajas: ${productName}`;
-    const tb = document.querySelector('#productDropTable tbody');
-    tb.innerHTML = '';
-    
-    data.forEach(d => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="font-weight: 500;">${d.client}</td>
-            <td>${formatNumber(d.prev)}</td>
-            <td>${formatNumber(d.current)}</td>
-            <td style="color: var(--danger); font-weight: 600;">${formatNumber(d.diff)}</td>
-        `;
-        tb.appendChild(tr);
-    });
-    
-    document.getElementById('productDropModal').classList.remove('hidden');
-    lucide.createIcons();
-};
-
-document.getElementById('btnCloseModal').addEventListener('click', () => {
-    document.getElementById('productDropModal').classList.add('hidden');
-});
-
-// Presentation Modal Handlers
-document.getElementById('btnClosePresentation').addEventListener('click', () => {
-    document.getElementById('clientDetails').classList.add('hidden');
-    document.getElementById('clientEmptyState').classList.remove('hidden');
-});
-
-// Función para verificar si hay un vendedor bloqueado por URL
-function checkLockedComercial() {
-    const params = new URLSearchParams(window.location.search);
-    const vCode = params.get('v'); // Ejemplo: ?v=52 o ?v=43
-    
-    if (vCode) {
-        lockedComercial = vCode;
-        console.log('Modo Comercial bloqueado para:', lockedComercial);
-        
-        // Estilos para ocultar botones de administración y pestañas innecesarias
-        const style = document.createElement('style');
-        style.textContent = `
-            #btnClearData, #btnExportRemote, .sidebar-bottom, [data-view="comercial"] { display: none !important; }
-        `;
-        document.head.appendChild(style);
-        
-        // Cambiar el título al cargar
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                const title = document.querySelector('header h1');
-                if (title) title.textContent = 'Mi Panel de Ventas';
-                const subtitle = document.querySelector('.subtitle');
-                if (subtitle) subtitle.textContent = 'Análisis Personalizado';
-            }, 500);
-        });
-    }
-}
-
-function renderMixView() {
-    const clientsMix = {};
-    
-    globalData.forEach(r => {
-        const clientKey = r.cliente; 
-        if (!clientsMix[clientKey]) {
-            clientsMix[clientKey] = {
-                prods: new Set(),
-                comercial: r.comercial
-            };
-        }
-        clientsMix[clientKey].prods.add(r.producto);
-    });
-
-    const categories = {
-        '1_4': [],
-        '5_10': [],
-        '11_20': [],
-        '21_plus': []
-    };
-
-    Object.entries(clientsMix).forEach(([name, data]) => {
-        const count = data.prods.size;
-        const info = { name, count, comercial: data.comercial };
-        
-        if (count <= 4) categories['1_4'].push(info);
-        else if (count <= 10) categories['5_10'].push(info);
-        else if (count <= 20) categories['11_20'].push(info);
-        else categories['21_plus'].push(info);
-    });
-
-    // Update Counts and Tables
-    const updateCat = (id, list, tableId) => {
-        const countEl = document.getElementById(id);
-        if (countEl) countEl.textContent = `${list.length} Clientes`;
-        
-        const tb = document.querySelector(`#${tableId} tbody`);
-        if (tb) {
-            tb.innerHTML = '';
-            list.sort((a,b) => b.count - a.count).forEach(c => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td style="font-size:0.85rem;">${c.name} <br><small style="color:var(--text-muted)">${c.comercial}</small></td><td style="font-weight:700; color:var(--primary)">${c.count}</td>`;
-                tb.appendChild(tr);
-            });
-        }
-    };
-
-    updateCat('countMix1_4', categories['1_4'], 'tableMix1_4');
-    updateCat('countMix5_10', categories['5_10'], 'tableMix5_10');
-    updateCat('countMix11_20', categories['11_20'], 'tableMix11_20');
-    updateCat('countMix21_plus', categories['21_plus'], 'tableMix21_plus');
-
-    lucide.createIcons();
-}
-
-function exportMixToExcel() {
-    if (globalData.length === 0) {
-        alert('No hay datos para exportar.');
-        return;
-    }
-
-    const clientsMix = {};
-    globalData.forEach(r => {
-        const clientKey = r.cliente; 
-        if (!clientsMix[clientKey]) {
-            clientsMix[clientKey] = {
-                id: r.id_cliente,
-                name: r.cliente,
-                comercial: r.comercial,
-                prods: new Set()
-            };
-        }
-        clientsMix[clientKey].prods.add(r.producto);
-    });
-
-    const data = Object.values(clientsMix).map(d => {
-        const count = d.prods.size;
-        let category = '';
-        if (count <= 4) category = '1 a 4 Items';
-        else if (count <= 10) category = '5 a 10 Items';
-        else if (count <= 20) category = '11 a 20 Items';
-        else category = '+20 Items';
-
-        return {
-            'ID Cliente': d.id,
-            'Cliente': d.name,
-            'Comercial': d.comercial,
-            'Cant. Productos Distintos': count,
-            'Categoría Mix': category
-        };
-    }).sort((a, b) => b['Cant. Productos Distintos'] - a['Cant. Productos Distintos']);
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Mix de Productos");
-    
-    // Set column widths
-    const wscols = [
-        {wch: 15}, // ID
-        {wch: 40}, // Cliente
-        {wch: 25}, // Comercial
-        {wch: 25}, // Cantidad
-        {wch: 20}  // Categoria
-    ];
-    ws['!cols'] = wscols;
-
-    const fileName = `Mix_Productos_Catamarca_${new Date().toISOString().slice(0,10)}.xlsx`;
-    XLSX.writeFile(wb, fileName);
 }
