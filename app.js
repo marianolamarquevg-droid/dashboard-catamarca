@@ -1,11 +1,13 @@
 // Initialize Lucide icons
-lucide.createIcons();
+if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+}
 
 // State
 let rawGlobalData = [];
 let globalData = [];
 let currentView = 'dashboard';
-let lockedComercial = null; // Variable para bloquear vista por vendedor
+let lockedComercial = null;
 
 // IndexedDB Persistence
 const DB_NAME = 'SalesDB_v4';
@@ -68,12 +70,15 @@ function loadFromDB() {
 
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
+                
+                const dataStatus = document.getElementById('data-status');
                 if (dataStatus) {
                     dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
                     dataStatus.className = 'status-badge loaded';
                 }
                 const btnClear = document.getElementById('btnClearData');
                 const btnExport = document.getElementById('btnExportRemote');
+                const uploadOverlay = document.getElementById('uploadOverlay');
                 if (btnClear) btnClear.classList.remove('hidden');
                 if (btnExport) btnExport.classList.remove('hidden');
                 if (uploadOverlay) uploadOverlay.classList.add('hidden');
@@ -87,6 +92,7 @@ function loadFromDB() {
 document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
+    
     const btnClear = document.getElementById('btnClearData');
     if (btnClear) {
         btnClear.addEventListener('click', () => {
@@ -103,15 +109,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const monthFilter = document.getElementById('monthFilter');
                 if (monthFilter) monthFilter.classList.add('hidden');
                 btnClear.classList.add('hidden');
+                
+                const dataStatus = document.getElementById('data-status');
                 if (dataStatus) {
                     dataStatus.textContent = 'Esperando datos...';
                     dataStatus.className = 'status-badge empty';
                 }
+                const uploadOverlay = document.getElementById('uploadOverlay');
                 if (uploadOverlay) uploadOverlay.classList.remove('hidden');
+                
                 document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
                 const dashNav = document.querySelector(`[data-view="dashboard"]`);
                 if (dashNav) dashNav.classList.add('active');
-                Object.values(views).forEach(v => v.classList.add('hidden'));
+                Object.values(views).forEach(v => {
+                    if (v) v.classList.add('hidden');
+                });
             }
         });
     }
@@ -136,11 +148,15 @@ async function checkRemoteData() {
                 }
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
+                
+                const dataStatus = document.getElementById('data-status');
                 if (dataStatus) {
                     dataStatus.textContent = `Datos Sincronizados (${globalData.length} filas)`;
                     dataStatus.className = 'status-badge loaded';
                 }
+                const uploadOverlay = document.getElementById('uploadOverlay');
                 if (uploadOverlay) uploadOverlay.classList.add('hidden');
+                
                 const btnClear = document.getElementById('btnClearData');
                 const btnExport = document.getElementById('btnExportRemote');
                 if (btnClear) btnClear.classList.remove('hidden');
@@ -173,11 +189,7 @@ function exportDataForMobile() {
     alert('Archivo data.json descargado. Súbelo a tu repositorio de GitHub para actualizar a los comerciales.');
 }
 
-// DOM Elements
-const fileInput = document.getElementById('fileInput');
-const uploadOverlay = document.getElementById('uploadOverlay');
-const uploadBox = document.querySelector('.upload-box');
-const dataStatus = document.getElementById('data-status');
+// DOM Elements & Views
 const views = {
     dashboard: document.getElementById('dashboardView'),
     'client-search': document.getElementById('clientSearchView'),
@@ -204,6 +216,7 @@ function switchView(viewName) {
         if (v) v.classList.add('hidden');
     });
     
+    const uploadOverlay = document.getElementById('uploadOverlay');
     if (globalData.length > 0) {
         if (uploadOverlay) uploadOverlay.classList.add('hidden');
         if (views[viewName]) views[viewName].classList.remove('hidden');
@@ -213,6 +226,9 @@ function switchView(viewName) {
 }
 
 // Drag & Drop Handlers
+const uploadBox = document.querySelector('.upload-box');
+const fileInput = document.getElementById('fileInput');
+
 if (uploadBox) {
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         uploadBox.addEventListener(eventName, preventDefaults, false);
@@ -247,6 +263,7 @@ function preventDefaults(e) {
 function handleFiles(files) {
     if (files.length > 0) {
         const file = files[0];
+        const dataStatus = document.getElementById('data-status');
         if (dataStatus) {
             dataStatus.textContent = 'Procesando...';
             dataStatus.className = 'status-badge empty';
@@ -357,6 +374,7 @@ function processExcel(data) {
         
         saveToDB(rawGlobalData);
         
+        const dataStatus = document.getElementById('data-status');
         if (globalData.length === 0) {
             alert("No se encontraron registros válidos. Verifica que las columnas del Excel coincidan.");
             if (dataStatus) dataStatus.textContent = 'Sin datos compatibles';
@@ -374,6 +392,7 @@ function processExcel(data) {
         if (btnClear) btnClear.classList.remove('hidden');
         if (btnExport) btnExport.classList.remove('hidden');
         
+        const uploadOverlay = document.getElementById('uploadOverlay');
         if (uploadOverlay) uploadOverlay.classList.add('hidden');
         if (views[currentView]) views[currentView].classList.remove('hidden');
         
@@ -382,6 +401,7 @@ function processExcel(data) {
     } catch (e) {
         console.error(e);
         alert("Error al procesar el archivo Excel. Revisa el formato.");
+        const dataStatus = document.getElementById('data-status');
         if (dataStatus) {
             dataStatus.textContent = 'Error';
             dataStatus.className = 'status-badge empty';
@@ -568,7 +588,7 @@ function renderCharts(comercialStats) {
     }
 }
 
-// BÚSQUEDA CORREGIDA DE CLIENTES (Insensible a acentos y mayúsculas)
+// BÚSQUEDA DE CLIENTES CORREGIDA Y ROBUSTA
 const searchSuggestions = document.getElementById('searchSuggestions');
 const clientSearchInput = document.getElementById('clientSearchInput');
 
@@ -581,13 +601,19 @@ function normalizeText(str) {
 if (clientSearchInput) {
     clientSearchInput.addEventListener('input', (e) => {
         const term = normalizeText(e.target.value);
+        
         if (term.length < 2) {
-            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+            if (searchSuggestions) {
+                searchSuggestions.innerHTML = '';
+                searchSuggestions.classList.add('hidden');
+            }
             return;
         }
 
         const clientsMap = new Map();
-        rawGlobalData.forEach(r => {
+        const dataSource = globalData.length > 0 ? globalData : rawGlobalData;
+
+        dataSource.forEach(r => {
             const clienteNorm = normalizeText(r.cliente);
             const idNorm = normalizeText(r.id_cliente);
             if (clienteNorm.includes(term) || idNorm.includes(term)) {
@@ -600,7 +626,10 @@ if (clientSearchInput) {
         const suggestions = Array.from(clientsMap.entries()).slice(0, 10);
 
         if (suggestions.length === 0) {
-            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+            if (searchSuggestions) {
+                searchSuggestions.innerHTML = '';
+                searchSuggestions.classList.add('hidden');
+            }
             return;
         }
 
@@ -609,7 +638,12 @@ if (clientSearchInput) {
             suggestions.forEach(([id, name]) => {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
-                div.innerHTML = `<span class="client-id">${id}</span><span class="client-name">${name}</span>`;
+                div.style.padding = '10px 15px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                div.style.color = '#fff';
+                div.innerHTML = `<span style="opacity: 0.7; margin-right: 10px;">[${id}]</span> <b>${name}</b>`;
+                
                 div.addEventListener('click', () => {
                     clientSearchInput.value = name;
                     searchSuggestions.classList.add('hidden');
@@ -637,7 +671,10 @@ if (clientSearchInput) {
 
 const btnSearchClient = document.getElementById('btnSearchClient');
 if (btnSearchClient) {
-    btnSearchClient.addEventListener('click', searchClient);
+    btnSearchClient.addEventListener('click', () => {
+        if (searchSuggestions) searchSuggestions.classList.add('hidden');
+        searchClient();
+    });
 }
 
 function searchClient() {
@@ -645,7 +682,8 @@ function searchClient() {
     const term = normalizeText(clientSearchInput.value);
     if (!term) return;
 
-    const clientRows = globalData.filter(r => normalizeText(r.id_cliente).includes(term) || normalizeText(r.cliente).includes(term));
+    const dataSource = globalData.length > 0 ? globalData : rawGlobalData;
+    const clientRows = dataSource.filter(r => normalizeText(r.id_cliente).includes(term) || normalizeText(r.cliente).includes(term));
     
     const emptyState = document.getElementById('clientEmptyState');
     const details = document.getElementById('clientDetails');
@@ -680,14 +718,7 @@ function searchClient() {
         totalRev += r.facturacion;
         monthStats[r.mes] = (monthStats[r.mes] || 0) + r.facturacion;
         
-        let invoiceKey = '';
-        if (r.factura && r.factura !== 'S/F' && r.factura.trim() !== '') {
-            invoiceKey = r.factura;
-        } else if (r.fecha_raw && r.fecha_raw !== 'S/F') {
-            invoiceKey = r.fecha_raw;
-        } else {
-            invoiceKey = 'row_' + Math.random();
-        }
+        let invoiceKey = r.factura && r.factura !== 'S/F' ? r.factura : (r.fecha_raw || 'row_' + Math.random());
         invoices.add(invoiceKey);
         
         if (!prodStats[r.producto]) prodStats[r.producto] = { qty: 0, byMonth: {}, lastMonth: '' };
