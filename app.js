@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL Y CONTENEDORES DE GRÁFICOS
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -197,6 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 display: block !important;
                 white-space: nowrap !important;
             }
+        }
+        /* Asegurar altura visible para los gráficos */
+        canvas {
+            min-height: 250px !important;
+            max-height: 350px !important;
+            width: 100% !important;
         }
     `;
     document.head.appendChild(mobileStyle);
@@ -524,7 +530,7 @@ function processExcel(data) {
         populateComercialSelect();
 
         if (dataStatus) {
-            dataStatus.textContent = `Datos Sincronizados (${globalData.length} filas)`;
+            dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
             dataStatus.className = 'status-badge loaded';
         }
         const btnClear = document.getElementById('btnClearData');
@@ -586,14 +592,12 @@ function renderDashboard() {
         if (!prodStats[row.producto]) prodStats[row.producto] = 0;
         prodStats[row.producto] += row.cantidad;
 
-        // Ranking de Clientes por Vendedor (Vendedor | Cliente)
         let keyCC = c + '|' + row.cliente;
         if (!clientComercialMap[keyCC]) {
             clientComercialMap[keyCC] = { vendedor: c, cliente: row.cliente, total: 0 };
         }
         clientComercialMap[keyCC].total += row.facturacion;
 
-        // Productos (Evolución)
         if (!productMonthlyMap[row.producto]) {
             productMonthlyMap[row.producto] = { totalQty: 0, byMonth: {}, clients: new Set() };
         }
@@ -602,7 +606,6 @@ function renderDashboard() {
         productMonthlyMap[row.producto].clients.add(row.cliente);
     });
 
-    // Rellenar KPIs
     const elRev = document.getElementById('kpiTotalRevenue');
     const elCli = document.getElementById('kpiTotalClients');
     const elItm = document.getElementById('kpiTotalItems');
@@ -622,7 +625,6 @@ function renderDashboard() {
     const elTopProd = document.getElementById('kpiTopProduct');
     if (elTopProd) elTopProd.textContent = topProduct ? topProduct[0] : '-';
 
-    // 1. Rellenar Tabla: Detalle de Compras por Cliente (Columnas: ID Cliente | Cliente | Comercial | Producto | Cantidad | Total)
     const tb = document.querySelector('#mainDetailTable tbody') || document.querySelector('.dashboard-view table tbody');
     if (tb) {
         tb.innerHTML = '';
@@ -658,7 +660,6 @@ function renderDashboard() {
         });
     }
 
-    // 2. Rellenar Tabla: Ranking de Clientes por Vendedor (Columnas: Vendedor | Cliente | Facturación)
     const tables = document.querySelectorAll('#dashboardView table, .dashboard-view table');
     if (tables.length > 1) {
         let rankingTableBody = tables[1].querySelector('tbody');
@@ -677,7 +678,6 @@ function renderDashboard() {
         }
     }
 
-    // 3. Rellenar Tabla: Productos (Evolución) con el icono del ojo (👁️)
     if (tables.length > 2) {
         let prodTableBody = tables[2].querySelector('tbody');
         if (prodTableBody) {
@@ -720,7 +720,91 @@ function renderDashboard() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// Modal dinámico para ver clientes al hacer clic en el ojo de un producto
+function renderCharts(comercialStats) {
+    let revByMonth = {};
+    (globalData.length > 0 ? globalData : rawGlobalData).forEach(r => {
+        revByMonth[r.mes] = (revByMonth[r.mes] || 0) + r.facturacion;
+    });
+    
+    let months = Object.keys(revByMonth).sort();
+    let revData = months.map(m => revByMonth[m]);
+
+    const ctxMonth = document.getElementById('monthlyRevenueChart');
+    if (ctxMonth && typeof Chart !== 'undefined') {
+        if (monthlyRevenueChartInst) monthlyRevenueChartInst.destroy();
+        monthlyRevenueChartInst = new Chart(ctxMonth, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Facturación ($)',
+                    data: revData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#10b981',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    let comercialLabels = Object.keys(comercialStats);
+    let comercialData = Object.values(comercialStats);
+
+    const ctxCom = document.getElementById('comercialRevenueChart');
+    if (ctxCom && typeof Chart !== 'undefined') {
+        if (comercialRevenueChartInst) comercialRevenueChartInst.destroy();
+        comercialRevenueChartInst = new Chart(ctxCom, {
+            type: 'doughnut',
+            data: {
+                labels: comercialLabels,
+                datasets: [{
+                    data: comercialData,
+                    backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { 
+                        position: 'bottom',
+                        labels: { color: '#f8fafc' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed !== null) {
+                                    let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    let percentage = ((context.parsed * 100) / total).toFixed(1) + '%';
+                                    label += formatCurrency(context.parsed) + ' (' + percentage + ')';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+    }
+}
+
 function showProductClientsModal(prodName) {
     let clientsWithProd = new Set();
     let clientQtyMap = {};
@@ -828,91 +912,6 @@ function renderComercialAnalysis(comercialName) {
             tbody.appendChild(tr);
         });
     });
-}
-
-function renderCharts(comercialStats) {
-    let revByMonth = {};
-    rawGlobalData.forEach(r => {
-        revByMonth[r.mes] = (revByMonth[r.mes] || 0) + r.facturacion;
-    });
-    
-    let months = Object.keys(revByMonth).sort();
-    let revData = months.map(m => revByMonth[m]);
-
-    const ctxMonth = document.getElementById('monthlyRevenueChart');
-    if (ctxMonth && typeof Chart !== 'undefined') {
-        if (monthlyRevenueChartInst) monthlyRevenueChartInst.destroy();
-        monthlyRevenueChartInst = new Chart(ctxMonth, {
-            type: 'line',
-            data: {
-                labels: months,
-                datasets: [{
-                    label: 'Facturación ($)',
-                    data: revData,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#10b981',
-                    tension: 0.3,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-    }
-
-    let comercialLabels = Object.keys(comercialStats);
-    let comercialData = Object.values(comercialStats);
-
-    const ctxCom = document.getElementById('comercialRevenueChart');
-    if (ctxCom && typeof Chart !== 'undefined') {
-        if (comercialRevenueChartInst) comercialRevenueChartInst.destroy();
-        comercialRevenueChartInst = new Chart(ctxCom, {
-            type: 'doughnut',
-            data: {
-                labels: comercialLabels,
-                datasets: [{
-                    data: comercialData,
-                    backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'],
-                    borderWidth: 0,
-                    hoverOffset: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { 
-                    legend: { 
-                        position: 'bottom',
-                        labels: { color: '#f8fafc' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.label || '';
-                                if (label) label += ': ';
-                                if (context.parsed !== null) {
-                                    let total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    let percentage = ((context.parsed * 100) / total).toFixed(1) + '%';
-                                    label += formatCurrency(context.parsed) + ' (' + percentage + ')';
-                                }
-                                return label;
-                            }
-                        }
-                    }
-                },
-                cutout: '70%'
-            }
-        });
-    }
 }
 
 // GESTIÓN Y CIERRE DEL MODAL DE CLIENTE
