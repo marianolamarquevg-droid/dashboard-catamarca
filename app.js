@@ -57,7 +57,6 @@ function applyMonthFilter(filterVal) {
         let targetMonths = new Set(allMonths.slice(-count));
         globalData = rawGlobalData.filter(r => targetMonths.has(r.mes));
     } else {
-        // Es un mes específico ej. "2026-06"
         globalData = rawGlobalData.filter(r => r.mes === filterVal);
     }
 
@@ -147,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL Y TABLAS
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -570,6 +569,8 @@ function renderDashboard() {
     let comercialStats = {};
     let clientStats = {};
     let prodStats = {};
+    let clientComercialMap = {};
+    let productMonthlyMap = {};
 
     globalData.forEach(row => {
         totalRevenue += row.facturacion;
@@ -584,8 +585,23 @@ function renderDashboard() {
 
         if (!prodStats[row.producto]) prodStats[row.producto] = 0;
         prodStats[row.producto] += row.cantidad;
+
+        // Mapa para Ranking de Clientes por Comercial
+        let keyCC = c + '|' + row.cliente;
+        if (!clientComercialMap[keyCC]) {
+            clientComercialMap[keyCC] = { comercial: c, cliente: row.cliente, total: 0 };
+        }
+        clientComercialMap[keyCC].total += row.facturacion;
+
+        // Mapa para Productos (Evolución)
+        if (!productMonthlyMap[row.producto]) {
+            productMonthlyMap[row.producto] = { totalQty: 0, byMonth: {} };
+        }
+        productMonthlyMap[row.producto].totalQty += row.cantidad;
+        productMonthlyMap[row.producto].byMonth[row.mes] = (productMonthlyMap[row.producto].byMonth[row.mes] || 0) + row.cantidad;
     });
 
+    // Rellenar KPIs
     const elRev = document.getElementById('kpiTotalRevenue');
     const elCli = document.getElementById('kpiTotalClients');
     const elItm = document.getElementById('kpiTotalItems');
@@ -605,7 +621,8 @@ function renderDashboard() {
     const elTopProd = document.getElementById('kpiTopProduct');
     if (elTopProd) elTopProd.textContent = topProduct ? topProduct[0] : '-';
 
-    const tb = document.querySelector('#mainDetailTable tbody');
+    // 1. Rellenar Tabla: Detalle de Compras por Cliente (o mainDetailTable)
+    const tb = document.querySelector('#mainDetailTable tbody') || document.querySelector('.dashboard-view table tbody');
     if (tb) {
         tb.innerHTML = '';
         let groupedData = {};
@@ -625,7 +642,7 @@ function renderDashboard() {
             groupedData[key].total += row.facturacion;
         });
 
-        let tableRows = Object.values(groupedData).sort((a, b) => b.total - a.total);
+        let tableRows = Object.values(groupedData).sort((a, b) => b.total - a.total).slice(0, 50);
         tableRows.forEach(item => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -638,6 +655,51 @@ function renderDashboard() {
             `;
             tb.appendChild(tr);
         });
+    }
+
+    // 2. Rellenar Tabla: Ranking de Clientes por Comercial
+    const tables = document.querySelectorAll('#dashboardView table, .dashboard-view table');
+    if (tables.length > 1) {
+        let rankingTableBody = tables[1].querySelector('tbody');
+        if (rankingTableBody) {
+            rankingTableBody.innerHTML = '';
+            let sortedCC = Object.values(clientComercialMap).sort((a, b) => b.total - a.total).slice(0, 20);
+            sortedCC.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding: 8px; color: #3b82f6; font-weight: 500;">${item.comercial}</td>
+                    <td style="padding: 8px; color: #fff; font-weight: 500;">${item.cliente}</td>
+                    <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatCurrency(item.total)}</td>
+                `;
+                rankingTableBody.appendChild(tr);
+            });
+        }
+    }
+
+    // 3. Rellenar Tabla: Productos (Evolución)
+    if (tables.length > 2) {
+        let prodTableBody = tables[2].querySelector('tbody');
+        if (prodTableBody) {
+            prodTableBody.innerHTML = '';
+            let sortedProds = Object.entries(productMonthlyMap).sort((a, b) => b[1].totalQty - a[1].totalQty).slice(0, 20);
+            sortedProds.forEach(([prodName, pData]) => {
+                let allM = Object.keys(pData.byMonth).sort();
+                let curM = allM[allM.length - 1] || '';
+                let prevM = allM[allM.length - 2] || '';
+                let qtyCur = pData.byMonth[curM] || 0;
+                let qtyPrev = pData.byMonth[prevM] || 0;
+                let diff = qtyCur - qtyPrev;
+                let trendIcon = diff > 0 ? '📈' : (diff < 0 ? '📉' : '➖');
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding: 8px; color: #fff; font-weight: 500;">${prodName}</td>
+                    <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatNumber(qtyCur)}</td>
+                    <td style="padding: 8px; text-align: right; color: #94a3b8;">${trendIcon} ${formatNumber(qtyCur)} vs ${formatNumber(qtyPrev)}</td>
+                `;
+                prodTableBody.appendChild(tr);
+            });
+        }
     }
 
     renderCharts(comercialStats);
