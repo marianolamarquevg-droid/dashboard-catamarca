@@ -93,7 +93,17 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // Configurar cierre de modal (Buscando botón por texto o clase)
+    // Aplicar estilo de una sola línea al input de búsqueda de cliente
+    const clientSearchInput = document.getElementById('clientSearchInput');
+    if (clientSearchInput) {
+        clientSearchInput.style.height = '48px';
+        clientSearchInput.style.minHeight = '48px';
+        clientSearchInput.style.maxHeight = '48px';
+        clientSearchInput.style.padding = '0 15px';
+        clientSearchInput.style.boxSizing = 'border-box';
+        clientSearchInput.style.resize = 'none';
+    }
+
     setupModalCloseHandlers();
 
     const btnClear = document.getElementById('btnClearData');
@@ -594,7 +604,6 @@ function renderCharts(comercialStats) {
 function setupModalCloseHandlers() {
     const details = document.getElementById('clientDetails');
     
-    // Buscar botones de cierre dentro de la ficha de cliente (por texto o clase)
     const allButtons = document.querySelectorAll('button');
     allButtons.forEach(btn => {
         if (btn.textContent.includes('Cerrar') || btn.innerHTML.includes('X') || btn.innerHTML.includes('x')) {
@@ -720,7 +729,6 @@ function searchClient() {
     if (emptyState) emptyState.classList.add('hidden');
     if (details) {
         details.classList.remove('hidden');
-        // Asegurarse de reasignar los eventos de cierre cada vez que se abre el modal
         setTimeout(setupModalCloseHandlers, 100);
     }
 
