@@ -33,6 +33,8 @@ function updateMonthFilter() {
     let allMonthsSet = new Set(rawGlobalData.map(d => d.mes));
     const monthSelect = document.getElementById('monthFilter');
     if (!monthSelect) return;
+    
+    const currentVal = monthSelect.value || 'ALL';
     monthSelect.innerHTML = '<option value="ALL">Todos los Meses</option>';
     monthSelect.innerHTML += '<option value="LAST_2">Últimos 2 Meses</option>';
     monthSelect.innerHTML += '<option value="LAST_3">Últimos 3 Meses</option>';
@@ -40,7 +42,26 @@ function updateMonthFilter() {
     Array.from(allMonthsSet).sort().forEach(m => {
         monthSelect.innerHTML += `<option value="${m}">${m}</option>`;
     });
+    monthSelect.value = currentVal;
     monthSelect.classList.remove('hidden');
+}
+
+function applyMonthFilter(filterVal) {
+    if (!rawGlobalData || rawGlobalData.length === 0) return;
+
+    if (filterVal === 'ALL') {
+        globalData = [...rawGlobalData];
+    } else if (filterVal.startsWith('LAST_')) {
+        let count = parseInt(filterVal.split('_')[1]);
+        let allMonths = Array.from(new Set(rawGlobalData.map(d => d.mes))).sort();
+        let targetMonths = new Set(allMonths.slice(-count));
+        globalData = rawGlobalData.filter(r => targetMonths.has(r.mes));
+    } else {
+        // Es un mes específico ej. "2026-06"
+        globalData = rawGlobalData.filter(r => r.mes === filterVal);
+    }
+
+    renderDashboard();
 }
 
 function populateComercialSelect() {
@@ -126,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL Y TABLAS DE ANÁLISIS
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -170,7 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 width: 100% !important;
                 box-sizing: border-box !important;
             }
-            /* Asegurar scroll horizontal suave para tablas anchas en móvil */
             .table-container, table {
                 width: 100% !important;
                 font-size: 0.75rem !important;
@@ -181,6 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     `;
     document.head.appendChild(mobileStyle);
+
+    const monthFilter = document.getElementById('monthFilter');
+    if (monthFilter) {
+        monthFilter.addEventListener('change', (e) => {
+            applyMonthFilter(e.target.value);
+        });
+    }
 
     const clientSearchInput = document.getElementById('clientSearchInput');
     if (clientSearchInput) {
@@ -335,7 +362,7 @@ function switchView(viewName) {
             }
         }
     } else {
-        if (uploadOverlay) uploadOverlay.classList.add('hidden');
+        if (uploadOverlay) uploadOverlay.classList.remove('hidden');
     }
 }
 
@@ -624,7 +651,6 @@ function renderComercialAnalysis(comercialName) {
     const comercialView = document.getElementById('comercialView');
     if (!comercialView) return;
 
-    // Detectar meses disponibles para calcular Mes Actual y Mes Anterior
     let allMonths = Array.from(new Set(comercialRows.map(r => r.mes))).sort();
     let currentMonth = allMonths[allMonths.length - 1] || '';
     let previousMonth = allMonths[allMonths.length - 2] || '';
