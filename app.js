@@ -93,51 +93,56 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS RESPONSIVOS PARA CORREGIR EL DESBORDE EN MÓVIL
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL (EVITA AMONTONAMIENTOS Y CORTES)
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
             #clientDetails {
                 position: relative !important;
-                width: 96% !important;
+                width: 100% !important;
                 max-width: 100% !important;
-                margin: 10px auto !important;
+                margin: 5px auto !important;
                 left: 0 !important;
                 right: 0 !important;
                 top: 0 !important;
                 transform: none !important;
-                padding: 12px !important;
+                padding: 10px !important;
                 box-sizing: border-box !important;
                 overflow-x: hidden !important;
             }
-            #clientDetails > div, #clientDetails .flex, #clientDetails header {
-                flex-direction: column !important;
-                align-items: stretch !important;
+            #clientDetails, #clientDetails * {
+                box-sizing: border-box !important;
             }
-            #cdName {
-                font-size: 1.3rem !important;
-                line-height: 1.2 !important;
-                word-break: break-word !important;
-            }
-            .kpi-container, #clientDetails .grid {
+            /* Forzar diseño vertical en el header y KPIs del modal */
+            #clientDetails .flex, #clientDetails header, #clientDetails .grid, .kpi-container {
                 display: flex !important;
                 flex-direction: column !important;
-                gap: 6px !important;
+                align-items: stretch !important;
+                width: 100% !important;
+                float: none !important;
+            }
+            #cdName {
+                font-size: 1.15rem !important;
+                line-height: 1.25 !important;
+                word-break: break-word !important;
+                white-space: normal !important;
+                width: 100% !important;
             }
             #cdTotal, #cdAverageTicket, #cdMixProductos {
-                font-size: 1.2rem !important;
+                font-size: 1.1rem !important;
+                white-space: normal !important;
             }
             #clientSearchInput {
                 height: 44px !important;
                 font-size: 16px !important;
                 width: 100% !important;
-                box-sizing: border-box !important;
             }
-            table {
+            /* Contenedor de tablas responsivo con scroll horizontal si es necesario */
+            .table-container, table {
+                width: 100% !important;
                 font-size: 0.75rem !important;
-                display: block !important;
                 overflow-x: auto !important;
-                white-space: nowrap !important;
+                display: block !important;
             }
         }
     `;
@@ -790,7 +795,7 @@ function searchClient() {
     const isMobile = window.innerWidth <= 768;
     if (elName) {
         elName.textContent = info.cliente;
-        elName.style.fontSize = isMobile ? '1.2rem' : '2rem';
+        elName.style.fontSize = isMobile ? '1.1rem' : '2rem';
     }
     if (elId) elId.textContent = info.id_cliente;
     if (elCom) elCom.innerHTML = `<i data-lucide="briefcase"></i> ${info.comercial}`;
