@@ -93,6 +93,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
+    // Configurar cierre de modal (Buscando botón por texto o clase)
+    setupModalCloseHandlers();
+
     const btnClear = document.getElementById('btnClearData');
     if (btnClear) {
         btnClear.addEventListener('click', () => {
@@ -295,7 +298,6 @@ function findCol(headers, possibleNames) {
     return -1;
 }
 
-// PROCESAMIENTO DINÁMICO CORREGIDO PARA EVITAR CEROS
 function processExcel(data) {
     try {
         const workbook = XLSX.read(data, { type: 'array' });
@@ -588,6 +590,23 @@ function renderCharts(comercialStats) {
     }
 }
 
+// GESTIÓN Y CIERRE DEL MODAL DE CLIENTE
+function setupModalCloseHandlers() {
+    const details = document.getElementById('clientDetails');
+    
+    // Buscar botones de cierre dentro de la ficha de cliente (por texto o clase)
+    const allButtons = document.querySelectorAll('button');
+    allButtons.forEach(btn => {
+        if (btn.textContent.includes('Cerrar') || btn.innerHTML.includes('X') || btn.innerHTML.includes('x')) {
+            btn.addEventListener('click', () => {
+                if (details) details.classList.add('hidden');
+                if (searchSuggestions) searchSuggestions.classList.add('hidden');
+                if (clientSearchInput) clientSearchInput.value = '';
+            });
+        }
+    });
+}
+
 // BÚSQUEDA DE CLIENTES CORREGIDA Y ROBUSTA
 const searchSuggestions = document.getElementById('searchSuggestions');
 const clientSearchInput = document.getElementById('clientSearchInput');
@@ -699,7 +718,11 @@ function searchClient() {
     }
 
     if (emptyState) emptyState.classList.add('hidden');
-    if (details) details.classList.remove('hidden');
+    if (details) {
+        details.classList.remove('hidden');
+        // Asegurarse de reasignar los eventos de cierre cada vez que se abre el modal
+        setTimeout(setupModalCloseHandlers, 100);
+    }
 
     const info = clientRows[0];
     const elName = document.getElementById('cdName');
