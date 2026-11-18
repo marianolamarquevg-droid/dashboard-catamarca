@@ -52,7 +52,6 @@ function populateComercialSelect() {
         }
     });
 
-    // Buscar cualquier select o contenedor en la vista de comercial
     const possibleSelectors = [
         document.getElementById('comercialSelect'),
         document.getElementById('selectComercial'),
@@ -63,10 +62,12 @@ function populateComercialSelect() {
 
     possibleSelectors.forEach(select => {
         if (select) {
+            const currentVal = select.value;
             select.innerHTML = '<option value="">Selecciona un Comercial...</option>';
             Array.from(comercialesSet).sort().forEach(c => {
                 select.innerHTML += `<option value="${c}">${c}</option>`;
             });
+            if (currentVal) select.value = currentVal;
             select.style.height = '44px';
             select.style.fontSize = '16px';
             select.style.width = '100%';
@@ -190,7 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
         clientSearchInput.style.fontSize = '16px';
     }
 
-    // Escuchar cambios en cualquier select de comercial
     document.addEventListener('change', (e) => {
         if (e.target && (e.target.id === 'comercialSelect' || e.target.id === 'selectComercial' || e.target.id === 'vendedorSelect')) {
             renderComercialAnalysis(e.target.value);
@@ -618,7 +618,46 @@ function renderDashboard() {
 function renderComercialAnalysis(comercialName) {
     if (!comercialName) return;
     const comercialRows = globalData.filter(r => r.comercial === comercialName);
-    console.log(`Analizando comercial: ${comercialName}, con ${comercialRows.length} registros`);
+    
+    // Buscar la tabla de ranking en la vista comercial y rellenarla
+    const comercialView = document.getElementById('comercialView');
+    if (!comercialView) return;
+
+    let table = comercialView.querySelector('table');
+    if (!table) {
+        const tables = document.querySelectorAll('table');
+        if (tables.length > 1) table = tables[1];
+    }
+
+    if (table) {
+        let tbody = table.querySelector('tbody');
+        if (!tbody) {
+            tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+        }
+        tbody.innerHTML = '';
+
+        let clientMap = {};
+        comercialRows.forEach(r => {
+            if (!clientMap[r.cliente]) {
+                clientMap[r.cliente] = { id: r.id_cliente, total: 0 };
+            }
+            clientMap[r.cliente].total += r.facturacion;
+        });
+
+        let sortedClients = Object.entries(clientMap).sort((a, b) => b[1].total - a[1].total);
+        let rank = 1;
+
+        sortedClients.forEach(([clientName, data]) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 8px; text-align: center; color: #10b981; font-weight: bold;">#${rank++}</td>
+                <td style="padding: 8px; color: #fff; font-weight: 500;">${clientName} (${data.id})</td>
+                <td style="padding: 8px; text-align: right; color: #35A29F; font-weight: 600;">${formatCurrency(data.total)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 }
 
 function renderCharts(comercialStats) {
