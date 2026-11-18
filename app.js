@@ -43,6 +43,24 @@ function updateMonthFilter() {
     monthSelect.classList.remove('hidden');
 }
 
+function populateComercialSelect() {
+    const select = document.getElementById('comercialSelect');
+    if (!select) return;
+    
+    let comercialesSet = new Set();
+    const dataSource = globalData.length > 0 ? globalData : rawGlobalData;
+    dataSource.forEach(r => {
+        if (r.comercial && r.comercial !== 'Sin Asignar') {
+            comercialesSet.add(r.comercial);
+        }
+    });
+
+    select.innerHTML = '<option value="">Selecciona un Comercial...</option>';
+    Array.from(comercialesSet).sort().forEach(c => {
+        select.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+}
+
 function loadFromDB() {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = (e) => {
@@ -70,6 +88,7 @@ function loadFromDB() {
 
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
+                populateComercialSelect();
                 
                 const dataStatus = document.getElementById('data-status');
                 if (dataStatus) {
@@ -93,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL (EVITA AMONTONAMIENTOS Y CORTES)
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL (MODAL, SELECTS Y TABLAS)
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -113,7 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
             #clientDetails, #clientDetails * {
                 box-sizing: border-box !important;
             }
-            /* Forzar diseño vertical en el header y KPIs del modal */
             #clientDetails .flex, #clientDetails header, #clientDetails .grid, .kpi-container {
                 display: flex !important;
                 flex-direction: column !important;
@@ -132,12 +150,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 font-size: 1.1rem !important;
                 white-space: normal !important;
             }
-            #clientSearchInput {
+            #clientSearchInput, #comercialSelect {
                 height: 44px !important;
                 font-size: 16px !important;
                 width: 100% !important;
+                box-sizing: border-box !important;
             }
-            /* Contenedor de tablas responsivo con scroll horizontal si es necesario */
             .table-container, table {
                 width: 100% !important;
                 font-size: 0.75rem !important;
@@ -157,6 +175,16 @@ document.addEventListener('DOMContentLoaded', () => {
         clientSearchInput.style.boxSizing = 'border-box';
         clientSearchInput.style.resize = 'none';
         clientSearchInput.style.fontSize = '16px';
+    }
+
+    const comercialSelect = document.getElementById('comercialSelect');
+    if (comercialSelect) {
+        comercialSelect.style.height = '44px';
+        comercialSelect.style.fontSize = '16px';
+        comercialSelect.style.width = '100%';
+        comercialSelect.addEventListener('change', (e) => {
+            renderComercialAnalysis(e.target.value);
+        });
     }
 
     setupModalCloseHandlers();
@@ -216,6 +244,7 @@ async function checkRemoteData() {
                 }
                 globalData = [...rawGlobalData];
                 updateMonthFilter();
+                populateComercialSelect();
                 
                 const dataStatus = document.getElementById('data-status');
                 if (dataStatus) {
@@ -287,7 +316,12 @@ function switchView(viewName) {
     const uploadOverlay = document.getElementById('uploadOverlay');
     if (globalData.length > 0) {
         if (uploadOverlay) uploadOverlay.classList.add('hidden');
-        if (views[viewName]) views[viewName].classList.remove('hidden');
+        if (views[viewName]) {
+            views[viewName].classList.remove('hidden');
+            if (viewName === 'comercial') {
+                populateComercialSelect();
+            }
+        }
     } else {
         if (uploadOverlay) uploadOverlay.classList.remove('hidden');
     }
@@ -449,6 +483,7 @@ function processExcel(data) {
         }
 
         updateMonthFilter();
+        populateComercialSelect();
 
         if (dataStatus) {
             dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
@@ -568,6 +603,14 @@ function renderDashboard() {
 
     renderCharts(comercialStats);
     if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function renderComercialAnalysis(comercialName) {
+    if (!comercialName) return;
+    const comercialRows = globalData.filter(r => r.comercial === comercialName);
+    
+    // Aquí puedes actualizar las tablas o tarjetas específicas de análisis por comercial si las tienes
+    console.log(`Analizando comercial: ${comercialName}, con ${comercialRows.length} registros`);
 }
 
 function renderCharts(comercialStats) {
