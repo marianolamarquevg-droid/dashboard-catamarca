@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL Y TABLAS DE ANÁLISIS
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -170,11 +170,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 width: 100% !important;
                 box-sizing: border-box !important;
             }
+            /* Asegurar scroll horizontal suave para tablas anchas en móvil */
             .table-container, table {
                 width: 100% !important;
                 font-size: 0.75rem !important;
                 overflow-x: auto !important;
                 display: block !important;
+                white-space: nowrap !important;
             }
         }
     `;
@@ -333,7 +335,7 @@ function switchView(viewName) {
             }
         }
     } else {
-        if (uploadOverlay) uploadOverlay.classList.remove('hidden');
+        if (uploadOverlay) uploadOverlay.classList.add('hidden');
     }
 }
 
@@ -622,7 +624,11 @@ function renderComercialAnalysis(comercialName) {
     const comercialView = document.getElementById('comercialView');
     if (!comercialView) return;
 
-    // Rellenar todas las tablas que existan dentro de la vista de comercial
+    // Detectar meses disponibles para calcular Mes Actual y Mes Anterior
+    let allMonths = Array.from(new Set(comercialRows.map(r => r.mes))).sort();
+    let currentMonth = allMonths[allMonths.length - 1] || '';
+    let previousMonth = allMonths[allMonths.length - 2] || '';
+
     const tables = comercialView.querySelectorAll('table');
     tables.forEach(table => {
         let tbody = table.querySelector('tbody');
@@ -635,20 +641,28 @@ function renderComercialAnalysis(comercialName) {
         let clientMap = {};
         comercialRows.forEach(r => {
             if (!clientMap[r.cliente]) {
-                clientMap[r.cliente] = { id: r.id_cliente, total: 0 };
+                clientMap[r.cliente] = { id: r.id_cliente, current: 0, previous: 0, total: 0 };
             }
             clientMap[r.cliente].total += r.facturacion;
+            if (r.mes === currentMonth) clientMap[r.cliente].current += r.facturacion;
+            if (r.mes === previousMonth) clientMap[r.cliente].previous += r.facturacion;
         });
 
         let sortedClients = Object.entries(clientMap).sort((a, b) => b[1].total - a[1].total);
         let rank = 1;
 
         sortedClients.forEach(([clientName, data]) => {
+            let diff = data.current - data.previous;
+            let trendIcon = diff > 0 ? '📈' : (diff < 0 ? '📉' : '➖');
+            let trendColor = diff > 0 ? '#10b981' : (diff < 0 ? '#ef4444' : '#94a3b8');
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding: 8px; text-align: center; color: #10b981; font-weight: bold;">#${rank++}</td>
                 <td style="padding: 8px; color: #fff; font-weight: 500;">${clientName} (${data.id})</td>
-                <td style="padding: 8px; text-align: right; color: #35A29F; font-weight: 600;">${formatCurrency(data.total)}</td>
+                <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatCurrency(data.current)}</td>
+                <td style="padding: 8px; text-align: right; color: #94a3b8;">${formatCurrency(data.previous)}</td>
+                <td style="padding: 8px; text-align: center; color: ${trendColor}; font-weight: bold;">${trendIcon} ${formatCurrency(diff)}</td>
             `;
             tbody.appendChild(tr);
         });
