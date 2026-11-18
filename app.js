@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('change', (e) => {
-        if (e.target && (e.target.id === 'comercialSelect' || e.target.id === 'selectComercial' || e.target.id === 'vendedorSelect')) {
+        if (e.target && (e.target.id === 'comercialSelect' || e.target.id === 'selectComercial' || e.target.id === 'vendedorSelect' || e.target.matches('#comercialView select'))) {
             renderComercialAnalysis(e.target.value);
         }
     });
@@ -619,17 +619,12 @@ function renderComercialAnalysis(comercialName) {
     if (!comercialName) return;
     const comercialRows = globalData.filter(r => r.comercial === comercialName);
     
-    // Buscar la tabla de ranking en la vista comercial y rellenarla
     const comercialView = document.getElementById('comercialView');
     if (!comercialView) return;
 
-    let table = comercialView.querySelector('table');
-    if (!table) {
-        const tables = document.querySelectorAll('table');
-        if (tables.length > 1) table = tables[1];
-    }
-
-    if (table) {
+    // Rellenar todas las tablas que existan dentro de la vista de comercial
+    const tables = comercialView.querySelectorAll('table');
+    tables.forEach(table => {
         let tbody = table.querySelector('tbody');
         if (!tbody) {
             tbody = document.createElement('tbody');
@@ -657,7 +652,7 @@ function renderComercialAnalysis(comercialName) {
             `;
             tbody.appendChild(tr);
         });
-    }
+    });
 }
 
 function renderCharts(comercialStats) {
