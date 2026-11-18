@@ -126,7 +126,7 @@ function loadFromDB() {
                 
                 const dataStatus = document.getElementById('data-status');
                 if (dataStatus) {
-                    dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
+                    dataStatus.textContent = `Datos Sincronizados (${globalData.length} filas)`;
                     dataStatus.className = 'status-badge loaded';
                 }
                 const btnClear = document.getElementById('btnClearData');
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL Y TABLAS
+    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -524,7 +524,7 @@ function processExcel(data) {
         populateComercialSelect();
 
         if (dataStatus) {
-            dataStatus.textContent = `Datos Cargados (${globalData.length} filas)`;
+            dataStatus.textContent = `Datos Sincronizados (${globalData.length} filas)`;
             dataStatus.className = 'status-badge loaded';
         }
         const btnClear = document.getElementById('btnClearData');
@@ -586,19 +586,20 @@ function renderDashboard() {
         if (!prodStats[row.producto]) prodStats[row.producto] = 0;
         prodStats[row.producto] += row.cantidad;
 
-        // Mapa para Ranking de Clientes por Comercial
+        // Mapa para Ranking de Clientes por Vendedor (Vendedor | Cliente)
         let keyCC = c + '|' + row.cliente;
         if (!clientComercialMap[keyCC]) {
-            clientComercialMap[keyCC] = { comercial: c, cliente: row.cliente, total: 0 };
+            clientComercialMap[keyCC] = { vendedor: c, cliente: row.cliente, total: 0 };
         }
         clientComercialMap[keyCC].total += row.facturacion;
 
-        // Mapa para Productos (Evolución)
+        // Mapa para Productos (Evolución) con detalle por mes para cada cliente
         if (!productMonthlyMap[row.producto]) {
-            productMonthlyMap[row.producto] = { totalQty: 0, byMonth: {} };
+            productMonthlyMap[row.producto] = { totalQty: 0, byMonth: {}, clients: new Set() };
         }
         productMonthlyMap[row.producto].totalQty += row.cantidad;
         productMonthlyMap[row.producto].byMonth[row.mes] = (productMonthlyMap[row.producto].byMonth[row.mes] || 0) + row.cantidad;
+        productMonthlyMap[row.producto].clients.add(row.cliente);
     });
 
     // Rellenar KPIs
@@ -621,7 +622,7 @@ function renderDashboard() {
     const elTopProd = document.getElementById('kpiTopProduct');
     if (elTopProd) elTopProd.textContent = topProduct ? topProduct[0] : '-';
 
-    // 1. Rellenar Tabla: Detalle de Compras por Cliente (o mainDetailTable)
+    // 1. Rellenar Tabla: Detalle de Compras por Cliente
     const tb = document.querySelector('#mainDetailTable tbody') || document.querySelector('.dashboard-view table tbody');
     if (tb) {
         tb.innerHTML = '';
@@ -657,17 +658,17 @@ function renderDashboard() {
         });
     }
 
-    // 2. Rellenar Tabla: Ranking de Clientes por Comercial
+    // 2. Rellenar Tabla: Ranking de Clientes por Vendedor (Vendedor | Cliente | Facturación)
     const tables = document.querySelectorAll('#dashboardView table, .dashboard-view table');
     if (tables.length > 1) {
         let rankingTableBody = tables[1].querySelector('tbody');
         if (rankingTableBody) {
             rankingTableBody.innerHTML = '';
-            let sortedCC = Object.values(clientComercialMap).sort((a, b) => b.total - a.total).slice(0, 20);
+            let sortedCC = Object.values(clientComercialMap).sort((a, b) => b.total - a.total).slice(0, 50);
             sortedCC.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td style="padding: 8px; color: #3b82f6; font-weight: 500;">${item.comercial}</td>
+                    <td style="padding: 8px; color: #3b82f6; font-weight: 500;">${item.vendedor}</td>
                     <td style="padding: 8px; color: #fff; font-weight: 500;">${item.cliente}</td>
                     <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatCurrency(item.total)}</td>
                 `;
@@ -676,34 +677,107 @@ function renderDashboard() {
         }
     }
 
-    // 3. Rellenar Tabla: Productos (Evolución)
+    // 3. Rellenar Tabla: Productos (Evolución) con el icono del ojo (👁️)
     if (tables.length > 2) {
         let prodTableBody = tables[2].querySelector('tbody');
         if (prodTableBody) {
             prodTableBody.innerHTML = '';
-            let sortedProds = Object.entries(productMonthlyMap).sort((a, b) => b[1].totalQty - a[1].totalQty).slice(0, 20);
+            let sortedProds = Object.entries(productMonthlyMap).sort((a, b) => b[1].totalQty - a[1].totalQty).slice(0, 50);
+            
             sortedProds.forEach(([prodName, pData]) => {
                 let allM = Object.keys(pData.byMonth).sort();
                 let curM = allM[allM.length - 1] || '';
                 let prevM = allM[allM.length - 2] || '';
                 let qtyCur = pData.byMonth[curM] || 0;
                 let qtyPrev = pData.byMonth[prevM] || 0;
-                let diff = qtyCur - qtyPrev;
-                let trendIcon = diff > 0 ? '📈' : (diff < 0 ? '📉' : '➖');
+                
+                let pctDiff = qtyPrev > 0 ? (((qtyCur - qtyPrev) / qtyPrev) * 100).toFixed(1) : '0.0';
+                let pctStr = (pctDiff >= 0 ? '+' : '') + pctDiff + '%';
+                let pctColor = pctDiff >= 0 ? '#10b981' : '#ef4444';
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
+                    <td style="padding: 8px; text-align: center; cursor: pointer;" class="eye-btn" data-product="${prodName}">
+                        <span style="font-size: 1.1rem;" title="Ver clientes">👁️</span>
+                    </td>
                     <td style="padding: 8px; color: #fff; font-weight: 500;">${prodName}</td>
                     <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatNumber(qtyCur)}</td>
-                    <td style="padding: 8px; text-align: right; color: #94a3b8;">${trendIcon} ${formatNumber(qtyCur)} vs ${formatNumber(qtyPrev)}</td>
+                    <td style="padding: 8px; text-align: right; color: ${pctColor}; font-weight: 600;">${pctStr}</td>
                 `;
                 prodTableBody.appendChild(tr);
+            });
+
+            // Evento para abrir el modal del ojo con los clientes del producto
+            prodTableBody.querySelectorAll('.eye-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    let prodName = btn.getAttribute('data-product');
+                    showProductClientsModal(prodName);
+                });
             });
         }
     }
 
     renderCharts(comercialStats);
     if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// Modal dinámico para ver clientes al hacer clic en el ojo de un producto
+function showProductClientsModal(prodName) {
+    let clientsWithProd = new Set();
+    let clientQtyMap = {};
+
+    globalData.forEach(r => {
+        if (r.producto === prodName) {
+            clientsWithProd.add(r.cliente);
+            clientQtyMap[r.cliente] = (clientQtyMap[r.cliente] || 0) + r.cantidad;
+        }
+    });
+
+    let allClients = new Set();
+    globalData.forEach(r => allClients.add(r.cliente));
+
+    let modal = document.getElementById('productClientsModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'productClientsModal';
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; padding:15px; box-sizing:border-box;';
+        document.body.appendChild(modal);
+    }
+
+    let clientsListHtml = '';
+    Array.from(allClients).sort().forEach(cli => {
+        let bought = clientsWithProd.has(cli);
+        let qty = clientQtyMap[cli] || 0;
+        let badgeColor = bought ? '#10b981' : '#ef4444';
+        let badgeText = bought ? `Compra (${formatNumber(qty)} un.)` : 'No compra';
+        
+        clientsListHtml += `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <span style="color:#fff; font-size:0.9rem; font-weight:500;">${cli}</span>
+                <span style="background:${badgeColor}20; color:${badgeColor}; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600;">${badgeText}</span>
+            </div>
+        `;
+    });
+
+    modal.innerHTML = `
+        <div style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:12px; width:100%; max-width:500px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+            <div style="padding:15px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="color:#fff; font-size:1rem; margin:0;">Clientes - ${prodName}</h3>
+                <button id="closeProdModal" style="background:transparent; border:none; color:#94a3b8; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <div style="padding:15px; overflow-y:auto; flex:1;">
+                ${clientsListHtml}
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+    document.getElementById('closeProdModal').onclick = () => {
+        modal.style.display = 'none';
+    };
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    };
 }
 
 function renderComercialAnalysis(comercialName) {
