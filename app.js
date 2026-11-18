@@ -93,35 +93,51 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // Inyectar estilos CSS responsivos para asegurar que en celulares no se amontone nada
+    // INYECTAR ESTILOS CSS RESPONSIVOS PARA CORREGIR EL DESBORDE EN MÓVIL
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
             #clientDetails {
-                padding: 10px !important;
-                max-height: 90vh !important;
-                overflow-y: auto !important;
+                position: relative !important;
+                width: 96% !important;
+                max-width: 100% !important;
+                margin: 10px auto !important;
+                left: 0 !important;
+                right: 0 !important;
+                top: 0 !important;
+                transform: none !important;
+                padding: 12px !important;
+                box-sizing: border-box !important;
+                overflow-x: hidden !important;
             }
             #clientDetails > div, #clientDetails .flex, #clientDetails header {
                 flex-direction: column !important;
-                align-items: flex-start !important;
+                align-items: stretch !important;
             }
             #cdName {
-                font-size: 1.2rem !important;
-                line-height: 1.3 !important;
-                margin-bottom: 10px !important;
+                font-size: 1.3rem !important;
+                line-height: 1.2 !important;
+                word-break: break-word !important;
             }
             .kpi-container, #clientDetails .grid {
                 display: flex !important;
                 flex-direction: column !important;
-                gap: 8px !important;
+                gap: 6px !important;
             }
             #cdTotal, #cdAverageTicket, #cdMixProductos {
-                font-size: 1.1rem !important;
+                font-size: 1.2rem !important;
             }
             #clientSearchInput {
                 height: 44px !important;
                 font-size: 16px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            table {
+                font-size: 0.75rem !important;
+                display: block !important;
+                overflow-x: auto !important;
+                white-space: nowrap !important;
             }
         }
     `;
