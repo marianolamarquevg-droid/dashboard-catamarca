@@ -146,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // INYECTAR ESTILOS CSS DEFINITIVOS PARA MÓVIL Y CONTENEDORES DE GRÁFICOS
     const mobileStyle = document.createElement('style');
     mobileStyle.innerHTML = `
         @media (max-width: 768px) {
@@ -198,7 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 white-space: nowrap !important;
             }
         }
-        /* Asegurar altura visible para los gráficos */
         canvas {
             min-height: 250px !important;
             max-height: 350px !important;
@@ -330,7 +328,6 @@ function exportDataForMobile() {
     alert('Archivo data.json descargado. Súbelo a tu repositorio de GitHub para actualizar a los comerciales.');
 }
 
-// DOM Elements & Views
 const views = {
     dashboard: document.getElementById('dashboardView'),
     'client-search': document.getElementById('clientSearchView'),
@@ -338,7 +335,6 @@ const views = {
     mix: document.getElementById('mixView')
 };
 
-// Nav links
 document.querySelectorAll('.sidebar nav a').forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -371,7 +367,6 @@ function switchView(viewName) {
     }
 }
 
-// Drag & Drop Handlers
 const uploadBox = document.querySelector('.upload-box');
 const fileInput = document.getElementById('fileInput');
 
@@ -555,7 +550,6 @@ function processExcel(data) {
     }
 }
 
-// Formatting helpers
 const formatCurrency = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
 const formatNumber = (val) => new Intl.NumberFormat('es-AR').format(val);
 
@@ -625,94 +619,104 @@ function renderDashboard() {
     const elTopProd = document.getElementById('kpiTopProduct');
     if (elTopProd) elTopProd.textContent = topProduct ? topProduct[0] : '-';
 
-    const tb = document.querySelector('#mainDetailTable tbody') || document.querySelector('.dashboard-view table tbody');
-    if (tb) {
-        tb.innerHTML = '';
-        let groupedData = {};
-        globalData.forEach(row => {
-            let key = row.id_cliente + '|' + row.producto;
-            if (!groupedData[key]) {
-                groupedData[key] = {
-                    id: row.id_cliente,
-                    cliente: row.cliente,
-                    comercial: row.comercial,
-                    producto: row.producto,
-                    cantidad: 0,
-                    total: 0
-                };
-            }
-            groupedData[key].cantidad += row.cantidad;
-            groupedData[key].total += row.facturacion;
-        });
-
-        let tableRows = Object.values(groupedData).sort((a, b) => b.total - a.total).slice(0, 50);
-        tableRows.forEach(item => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><span class="badge" style="background:rgba(59, 130, 246, 0.1); color:var(--primary)">${item.id}</span></td>
-                <td style="font-weight:500;">${item.cliente}</td>
-                <td>${item.comercial}</td>
-                <td>${item.producto}</td>
-                <td style="text-align: right;">${formatNumber(item.cantidad)}</td>
-                <td style="font-weight:600; color:var(--success); text-align: right;">${formatCurrency(item.total)}</td>
-            `;
-            tb.appendChild(tr);
-        });
-    }
-
-    const tables = document.querySelectorAll('#dashboardView table, .dashboard-view table');
-    if (tables.length > 1) {
-        let rankingTableBody = tables[1].querySelector('tbody');
-        if (rankingTableBody) {
-            rankingTableBody.innerHTML = '';
-            let sortedCC = Object.values(clientComercialMap).sort((a, b) => b[1].total - a[1].total).slice(0, 50);
-            sortedCC.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="padding: 8px; color: #3b82f6; font-weight: 500;">${item.vendedor}</td>
-                    <td style="padding: 8px; color: #fff; font-weight: 500;">${item.cliente}</td>
-                    <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatCurrency(item.total)}</td>
-                `;
-                rankingTableBody.appendChild(tr);
-            });
-        }
-    }
-
-    if (tables.length > 2) {
-        let prodTableBody = tables[2].querySelector('tbody');
-        if (prodTableBody) {
-            prodTableBody.innerHTML = '';
-            let sortedProds = Object.entries(productMonthlyMap).sort((a, b) => b[1].totalQty - a[1].totalQty).slice(0, 50);
-            
-            sortedProds.forEach(([prodName, pData]) => {
-                let allM = Object.keys(pData.byMonth).sort();
-                let curM = allM[allM.length - 1] || '';
-                let prevM = allM[allM.length - 2] || '';
-                let qtyCur = pData.byMonth[curM] || 0;
-                let qtyPrev = pData.byMonth[prevM] || 0;
-                
-                let pctDiff = qtyPrev > 0 ? (((qtyCur - qtyPrev) / qtyPrev) * 100).toFixed(1) : '0.0';
-                let pctStr = (pctDiff >= 0 ? '+' : '') + pctDiff + '%';
-                let pctColor = pctDiff >= 0 ? '#10b981' : '#ef4444';
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="padding: 8px; text-align: center; cursor: pointer;" class="eye-btn" data-product="${prodName}">
-                        <span style="font-size: 1.1rem;" title="Ver clientes">👁️</span>
-                    </td>
-                    <td style="padding: 8px; color: #fff; font-weight: 500;">${prodName}</td>
-                    <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatNumber(qtyCur)}</td>
-                    <td style="padding: 8px; text-align: right; color: ${pctColor}; font-weight: 600;">${pctStr}</td>
-                `;
-                prodTableBody.appendChild(tr);
-            });
-
-            prodTableBody.querySelectorAll('.eye-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    let prodName = btn.getAttribute('data-product');
-                    showProductClientsModal(prodName);
+    // Rellenar de forma segura todas las tablas del dashboard buscando por contenedor o ID
+    const dashView = document.getElementById('dashboardView');
+    if (dashView) {
+        const allTables = dashView.querySelectorAll('table');
+        
+        // 1. Detalle de Compras por Cliente (Primera tabla)
+        if (allTables.length > 0) {
+            let tb = allTables[0].querySelector('tbody');
+            if (tb) {
+                tb.innerHTML = '';
+                let groupedData = {};
+                globalData.forEach(row => {
+                    let key = row.id_cliente + '|' + row.producto;
+                    if (!groupedData[key]) {
+                        groupedData[key] = {
+                            id: row.id_cliente,
+                            cliente: row.cliente,
+                            comercial: row.comercial,
+                            producto: row.producto,
+                            cantidad: 0,
+                            total: 0
+                        };
+                    }
+                    groupedData[key].cantidad += row.cantidad;
+                    groupedData[key].total += row.facturacion;
                 });
-            });
+
+                let tableRows = Object.values(groupedData).sort((a, b) => b.total - a.total).slice(0, 50);
+                tableRows.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><span class="badge" style="background:rgba(59, 130, 246, 0.1); color:var(--primary)">${item.id}</span></td>
+                        <td style="font-weight:500;">${item.cliente}</td>
+                        <td>${item.comercial}</td>
+                        <td>${item.producto}</td>
+                        <td style="text-align: right;">${formatNumber(item.cantidad)}</td>
+                        <td style="font-weight:600; color:var(--success); text-align: right;">${formatCurrency(item.total)}</td>
+                    `;
+                    tb.appendChild(tr);
+                });
+            }
+        }
+
+        // 2. Ranking de Clientes por Vendedor (Segunda tabla)
+        if (allTables.length > 1) {
+            let rankingBody = allTables[1].querySelector('tbody');
+            if (rankingBody) {
+                rankingBody.innerHTML = '';
+                let sortedCC = Object.values(clientComercialMap).sort((a, b) => b.total - a.total).slice(0, 50);
+                sortedCC.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding: 8px; color: #3b82f6; font-weight: 500;">${item.vendedor}</td>
+                        <td style="padding: 8px; color: #fff; font-weight: 500;">${item.cliente}</td>
+                        <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatCurrency(item.total)}</td>
+                    `;
+                    rankingBody.appendChild(tr);
+                });
+            }
+        }
+
+        // 3. Productos (Evolución) con el icono del ojo (Tercera tabla)
+        if (allTables.length > 2) {
+            let prodBody = allTables[2].querySelector('tbody');
+            if (prodBody) {
+                prodBody.innerHTML = '';
+                let sortedProds = Object.entries(productMonthlyMap).sort((a, b) => b[1].totalQty - a[1].totalQty).slice(0, 50);
+                
+                sortedProds.forEach(([prodName, pData]) => {
+                    let allM = Object.keys(pData.byMonth).sort();
+                    let curM = allM[allM.length - 1] || '';
+                    let prevM = allM[allM.length - 2] || '';
+                    let qtyCur = pData.byMonth[curM] || 0;
+                    let qtyPrev = pData.byMonth[prevM] || 0;
+                    
+                    let pctDiff = qtyPrev > 0 ? (((qtyCur - qtyPrev) / qtyPrev) * 100).toFixed(1) : '0.0';
+                    let pctStr = (pctDiff >= 0 ? '+' : '') + pctDiff + '%';
+                    let pctColor = pctDiff >= 0 ? '#10b981' : '#ef4444';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding: 8px; text-align: center; cursor: pointer;" class="eye-btn" data-product="${prodName}">
+                            <span style="font-size: 1.1rem;" title="Ver clientes">👁️</span>
+                        </td>
+                        <td style="padding: 8px; color: #fff; font-weight: 500;">${prodName}</td>
+                        <td style="padding: 8px; text-align: right; color: #10b981; font-weight: 600;">${formatNumber(qtyCur)}</td>
+                        <td style="padding: 8px; text-align: right; color: ${pctColor}; font-weight: 600;">${pctStr}</td>
+                    `;
+                    prodBody.appendChild(tr);
+                });
+
+                prodBody.querySelectorAll('.eye-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        let prodName = btn.getAttribute('data-product');
+                        showProductClientsModal(prodName);
+                    });
+                });
+            }
         }
     }
 
@@ -914,10 +918,8 @@ function renderComercialAnalysis(comercialName) {
     });
 }
 
-// GESTIÓN Y CIERRE DEL MODAL DE CLIENTE
 function setupModalCloseHandlers() {
     const details = document.getElementById('clientDetails');
-    
     const allButtons = document.querySelectorAll('button');
     allButtons.forEach(btn => {
         if (btn.textContent.includes('Cerrar') || btn.innerHTML.includes('X') || btn.innerHTML.includes('x')) {
@@ -930,7 +932,6 @@ function setupModalCloseHandlers() {
     });
 }
 
-// BÚSQUEDA DE CLIENTES CORREGIDA Y ROBUSTA
 const searchSuggestions = document.getElementById('searchSuggestions');
 const clientSearchInput = document.getElementById('clientSearchInput');
 
@@ -943,7 +944,6 @@ function normalizeText(str) {
 if (clientSearchInput) {
     clientSearchInput.addEventListener('input', (e) => {
         const term = normalizeText(e.target.value);
-        
         if (term.length < 2) {
             if (searchSuggestions) {
                 searchSuggestions.innerHTML = '';
@@ -966,7 +966,6 @@ if (clientSearchInput) {
         });
 
         const suggestions = Array.from(clientsMap.entries()).slice(0, 10);
-
         if (suggestions.length === 0) {
             if (searchSuggestions) {
                 searchSuggestions.innerHTML = '';
