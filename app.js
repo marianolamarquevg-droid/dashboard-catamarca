@@ -93,15 +93,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromDB();
     checkRemoteData(); 
     
-    // Estilo de una sola línea para el input de búsqueda
+    // Estilo de una sola línea y adaptado para móvil en el input de búsqueda
     const clientSearchInput = document.getElementById('clientSearchInput');
     if (clientSearchInput) {
-        clientSearchInput.style.height = '48px';
-        clientSearchInput.style.minHeight = '48px';
-        clientSearchInput.style.maxHeight = '48px';
-        clientSearchInput.style.padding = '0 15px';
+        clientSearchInput.style.height = '44px';
+        clientSearchInput.style.minHeight = '44px';
+        clientSearchInput.style.maxHeight = '44px';
+        clientSearchInput.style.padding = '0 12px';
         clientSearchInput.style.boxSizing = 'border-box';
         clientSearchInput.style.resize = 'none';
+        clientSearchInput.style.fontSize = '16px'; // Evita zoom automático en iOS
     }
 
     setupModalCloseHandlers();
@@ -730,13 +731,34 @@ function searchClient() {
     if (details) {
         details.classList.remove('hidden');
         setTimeout(setupModalCloseHandlers, 100);
+        
+        // APLICAR ESTILOS RESPONSIVOS DINÁMICOS PARA CELULAR / PC AL ABRIR EL MODAL
+        const isMobile = window.innerWidth <= 768;
+        
+        const elName = document.getElementById('cdName');
+        if (elName) {
+            elName.textContent = info.cliente;
+            elName.style.fontSize = isMobile ? '1.5rem' : '2.5rem';
+            elName.style.lineHeight = '1.2';
+        }
+
+        // Ajustar tamaños de números y textos de KPIs en el modal
+        const kpiValues = details.querySelectorAll('.kpi-value, #cdTotal, #cdAverageTicket, #cdMixProductos');
+        kpiValues.forEach(el => {
+            el.style.fontSize = isMobile ? '1.2rem' : '2rem';
+        });
     }
 
     const info = clientRows[0];
     const elName = document.getElementById('cdName');
     const elId = document.getElementById('cdId');
     const elCom = document.getElementById('cdComercial');
-    if (elName) elName.textContent = info.cliente;
+    
+    const isMobile = window.innerWidth <= 768;
+    if (elName) {
+        elName.textContent = info.cliente;
+        elName.style.fontSize = isMobile ? '1.4rem' : '2.5rem';
+    }
     if (elId) elId.textContent = info.id_cliente;
     if (elCom) elCom.innerHTML = `<i data-lucide="briefcase"></i> ${info.comercial}`;
 
@@ -765,18 +787,25 @@ function searchClient() {
     const elTot = document.getElementById('cdTotal');
     const elAvg = document.getElementById('cdAverageTicket');
     const elMix = document.getElementById('cdMixProductos');
-    if (elTot) elTot.textContent = formatCurrency(totalRev);
+    
+    if (elTot) {
+        elTot.textContent = formatCurrency(totalRev);
+        elTot.style.fontSize = isMobile ? '1.1rem' : '1.8rem';
+    }
     let avgTicket = invoices.size > 0 ? totalRev / invoices.size : 0;
-    if (elAvg) elAvg.textContent = formatCurrency(avgTicket);
-    if (elMix) elMix.textContent = Object.keys(prodStats).length;
+    if (elAvg) {
+        elAvg.textContent = formatCurrency(avgTicket);
+        elAvg.style.fontSize = isMobile ? '1.1rem' : '1.8rem';
+    }
+    if (elMix) {
+        elMix.textContent = Object.keys(prodStats).length;
+        elMix.style.fontSize = isMobile ? '1.2rem' : '2rem';
+    }
 
-    // OBTENER LOS ÚLTIMOS MESES (HASTA 6) DEL CLIENTE PARA LAS COLUMNAS DE LA TABLA
     let sortedClientMonths = Array.from(clientMonthsSet).sort().slice(-6);
 
-    // RENDERIZAR TABLA DE PRODUCTOS CON COLUMNAS POR MES
     let productsTable = details.querySelector('table');
     if (!productsTable) {
-        // Buscar cualquier tabla dentro de clientDetails
         productsTable = details.querySelector('.table-container table') || details.querySelector('table');
     }
 
@@ -787,12 +816,11 @@ function searchClient() {
             productsTable.prepend(thead);
         }
         
-        // Construir cabecera dinámica con Producto + Meses + Total
-        let headerHtml = `<tr><th style="padding: 10px; text-align: left;">Producto</th>`;
+        let headerHtml = `<tr><th style="padding: 8px; text-align: left; font-size: ${isMobile ? '0.8rem' : '1rem'};">Producto</th>`;
         sortedClientMonths.forEach(m => {
-            headerHtml += `<th style="padding: 10px; text-align: right;">${m}</th>`;
+            headerHtml += `<th style="padding: 8px; text-align: right; font-size: ${isMobile ? '0.75rem' : '0.9rem'};">${m}</th>`;
         });
-        headerHtml += `<th style="padding: 10px; text-align: right;">Total</th></tr>`;
+        headerHtml += `<th style="padding: 8px; text-align: right; font-size: ${isMobile ? '0.8rem' : '1rem'};">Total</th></tr>`;
         thead.innerHTML = headerHtml;
 
         let tbody = productsTable.querySelector('tbody');
@@ -805,14 +833,14 @@ function searchClient() {
         let sortedProducts = Object.entries(prodStats).sort((a, b) => b[1].qty - a[1].qty);
         
         sortedProducts.forEach(([prodName, pData]) => {
-            let rowHtml = `<td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; font-weight: 500;">${prodName}</td>`;
+            let rowHtml = `<td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; font-size: ${isMobile ? '0.8rem' : '0.95rem'}; font-weight: 500;">${prodName}</td>`;
             
             sortedClientMonths.forEach(m => {
                 let qtyMonth = pData.byMonth[m] || 0;
-                rowHtml += `<td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; color: #94a3b8;">${qtyMonth > 0 ? formatNumber(qtyMonth) : '-'}</td>`;
+                rowHtml += `<td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; font-size: ${isMobile ? '0.8rem' : '0.95rem'}; color: #94a3b8;">${qtyMonth > 0 ? formatNumber(qtyMonth) : '-'}</td>`;
             });
 
-            rowHtml += `<td style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; font-weight: 600; color: #10b981;">${formatNumber(pData.qty)}</td>`;
+            rowHtml += `<td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; font-size: ${isMobile ? '0.85rem' : '1rem'}; font-weight: 600; color: #10b981;">${formatNumber(pData.qty)}</td>`;
 
             const tr = document.createElement('tr');
             tr.innerHTML = rowHtml;
